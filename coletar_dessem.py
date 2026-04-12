@@ -3,35 +3,23 @@ GNA I & II — Coleta pdo_oper_titulacao_usinas.dat — ONS/SINTEGRE
 Roda via GitHub Actions a cada 5 minutos
 """
 
-import json
-import logging
-import os
-import re
-import time
-import zipfile
-import io
+import json, logging, os, re, time, zipfile, io
 from datetime import datetime, timezone
 from pathlib import Path
-
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
 ONS_USER = os.environ.get("ONS_USER", "")
 ONS_PASS = os.environ.get("ONS_PASS", "")
-
 URL_PORTAL    = "https://pops.ons.org.br/"
 URL_HISTORICO = "https://sintegre.ons.org.br/sites/9/51//paginas/servicos/historico-de-produtos.aspx?produto=Decks%20de%20entrada%20e%20sa%C3%ADda%20-%20Modelo%20DESSEM"
-
 ARQUIVO_DAT  = "pdo_oper_titulacao_usinas.dat"
-PLANTAS_ALVO = ["GNA I", "GNA II", "GNA 1", "GNA 2", "GNAI", "GNAII", "UTE GNA"]
-
+PLANTAS_ALVO = ["GNA I","GNA II","GNA 1","GNA 2","GNAI","GNAII","UTE GNA"]
 DOCS_DIR  = Path(__file__).parent / "docs"
 JSON_FILE = DOCS_DIR / "dados_gna.json"
 RAW_FILE  = DOCS_DIR / "pdo_oper_titulacao_usinas.dat"
 DOCS_DIR.mkdir(exist_ok=True)
-
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("GNA-DAT")
-
 
 def fazer_login(page):
     log.info("Acessando portal ONS...")
@@ -41,277 +29,186 @@ def fazer_login(page):
         _preencher_credenciais(page)
     try:
         page.wait_for_url("**/pops.ons.org.br/**", timeout=40000)
-        log.info("Autenticado no portal.")
+        log.info("Autenticado.")
     except PWTimeout:
-        log.warning("Timeout redirecionamento.")
+        log.warning("Timeout login.")
     time.sleep(2)
 
-
 def _preencher_credenciais(page):
-    for sel in ["input[name='username']", "input[id='username']", "input[type='email']", "#i0116"]:
+    for sel in ["input[name='username']","input[id='username']","input[type='email']","#i0116"]:
         try:
             el = page.locator(sel).first
             el.wait_for(timeout=8000)
             el.fill(ONS_USER)
-            log.info(f"Usuario preenchido via {sel}")
             break
-        except Exception:
-            continue
-    for sel in ["#idSIButton9", "button:has-text('Next')", "button:has-text('Proximo')"]:
-        try:
-            page.locator(sel).first.click(timeout=3000)
-            time.sleep(1)
-            break
-        except Exception:
-            continue
-    for sel in ["input[name='password']", "input[id='password']", "input[type='password']", "#i0118"]:
+        except: continue
+    for sel in ["#idSIButton9","button:has-text('Next')"]:
+        try: page.locator(sel).first.click(timeout=3000); time.sleep(1); break
+        except: continue
+    for sel in ["input[name='password']","input[id='password']","input[type='password']","#i0118"]:
         try:
             el = page.locator(sel).first
             el.wait_for(timeout=10000)
             el.fill(ONS_PASS)
-            log.info(f"Senha preenchida via {sel}")
             break
-        except Exception:
-            continue
-    for sel in ["button[type='submit']", "input[type='submit']", "button:has-text('Entrar')", "#idSIButton9"]:
-        try:
-            page.locator(sel).first.click(timeout=5000)
-            log.info("Botao login clicado.")
-            break
-        except Exception:
-            continue
+        except: continue
+    for sel in ["button[type='submit']","input[type='submit']","button:has-text('Entrar')","#idSIButton9"]:
+        try: page.locator(sel).first.click(timeout=5000); break
+        except: continue
     time.sleep(2)
 
-
 def encontrar_zip_mais_recente(page):
-    log.info(f"Acessando historico: {URL_HISTORICO}")
+    log.info(f"Acessando historico SINTEGRE...")
     page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
     time.sleep(4)
-
-    links_zip = page.locator("a[href*='.zip'], a[href*='download.aspx']").all()
-    log.info(f"Encontrados {len(links_zip)} links de download.")
-
-    urls_zip = []
-    for link in links_zip:
+    links = page.locator("a[href*='.zip'], a[href*='download.aspx']").all()
+    log.info(f"Links encontrados: {len(links)}")
+    urls = []
+    for link in links:
         href = link.get_attribute("href") or ""
         if ".zip" in href.lower() or "download.aspx" in href.lower():
             if not href.startswith("http"):
                 href = "https://sintegre.ons.org.br" + href
-            urls_zip.append(href)
+            urls.append(href)
             log.info(f"  ZIP: {href}")
-
-    return urls_zip[0] if urls_zip else None
-
+    return urls[0] if urls else None
 
 def baixar_zip_e_extrair_dat(page, url_zip):
-    log.info(f"Baixando ZIP: {url_zip}")
-
+    log.info(f"Baixando: {url_zip}")
     resultado = page.evaluate(f"""
         async () => {{
             try {{
-                const resp = await fetch('{url_zip}', {{
-                    credentials: 'include',
-                    headers: {{ 'Accept': '*/*' }}
-                }});
-                if (!resp.ok) return {{ erro: 'HTTP ' + resp.status }};
-                const buffer = await resp.arrayBuffer();
-                const bytes = Array.from(new Uint8Array(buffer));
-                return {{ bytes: bytes }};
-            }} catch(e) {{
-                return {{ erro: e.toString() }};
-            }}
+                const resp = await fetch('{url_zip}', {{credentials:'include'}});
+                if (!resp.ok) return {{erro: 'HTTP '+resp.status}};
+                const buf = await resp.arrayBuffer();
+                return {{bytes: Array.from(new Uint8Array(buf))}};
+            }} catch(e) {{ return {{erro: e.toString()}}; }}
         }}
     """)
-
     if not resultado or "erro" in resultado:
-        log.error(f"Erro ao baixar ZIP: {resultado}")
+        log.error(f"Erro download: {resultado}")
         return None
-
     zip_bytes = bytes(resultado["bytes"])
-    log.info(f"ZIP baixado: {len(zip_bytes)} bytes")
-
+    log.info(f"ZIP: {len(zip_bytes)} bytes")
     try:
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             arquivos = zf.namelist()
-            log.info(f"Arquivos no ZIP: {arquivos}")
-
-            dat_encontrado = None
-            for nome in arquivos:
-                if ARQUIVO_DAT.lower() in nome.lower() or "pdo_oper" in nome.lower():
-                    dat_encontrado = nome
-                    break
-            if not dat_encontrado:
-                for nome in arquivos:
-                    if nome.lower().endswith(".dat"):
-                        dat_encontrado = nome
-                        break
-
-            if not dat_encontrado:
-                log.error(f"DAT nao encontrado no ZIP: {arquivos}")
+            log.info(f"Conteudo ZIP: {arquivos}")
+            dat = next((n for n in arquivos if ARQUIVO_DAT.lower() in n.lower() or "pdo_oper" in n.lower()), None)
+            if not dat:
+                dat = next((n for n in arquivos if n.lower().endswith(".dat")), None)
+            if not dat:
+                log.error(f"DAT nao encontrado: {arquivos}")
                 return None
-
-            log.info(f"Extraindo: {dat_encontrado}")
-            conteudo = zf.read(dat_encontrado).decode("latin-1", errors="replace")
-            log.info(f"Arquivo extraido: {len(conteudo)} chars")
-            return conteudo
+            log.info(f"Extraindo: {dat}")
+            return zf.read(dat).decode("latin-1", errors="replace")
     except Exception as e:
-        log.error(f"Erro descompactar: {e}")
+        log.error(f"Erro ZIP: {e}")
         return None
-
 
 def parsear_dat(conteudo):
     linhas = conteudo.splitlines()
-    log.info(f"Arquivo tem {len(linhas)} linhas")
-
-    cabecalho_idx = None
-    cabecalho_raw = ""
-    colunas = []
-
+    log.info(f"Linhas: {len(linhas)}")
+    cab_idx, cab_raw, colunas = None, "", []
     for i, linha in enumerate(linhas):
-        if linha.strip().startswith(("&", "%", "/")):
+        if linha.strip().startswith(("&","%","/")):
             continue
-        if re.search(r'\b(NOME|USINA|USINAMED|NOMEUSINA|IUSI|NUM|CODNOME)\b', linha, re.I):
-            cabecalho_idx = i
-            cabecalho_raw = linha
-            colunas = linha.split()
+        if re.search(r'\b(NOME|USINA|USINAMED|IUSI|NUM|CODNOME)\b', linha, re.I):
+            cab_idx, cab_raw, colunas = i, linha, linha.split()
             log.info(f"Cabecalho linha {i}: {colunas}")
             break
-
     if not colunas:
-        max_campos = 0
+        max_c = 0
         for i, linha in enumerate(linhas[:80]):
-            if linha.strip().startswith(("&", "%", "/")):
+            if linha.strip().startswith(("&","%","/")):
                 continue
-            campos = linha.split()
-            if len(campos) > max_campos:
-                max_campos = len(campos)
-                cabecalho_idx = i
-                cabecalho_raw = linha
-                colunas = campos
-
-    registros_gna = []
-    if cabecalho_idx is not None:
-        for linha in linhas[cabecalho_idx + 1:]:
+            c = linha.split()
+            if len(c) > max_c:
+                max_c, cab_idx, cab_raw, colunas = len(c), i, linha, c
+    registros = []
+    if cab_idx is not None:
+        for linha in linhas[cab_idx+1:]:
             linha = linha.rstrip()
-            if not linha or linha.strip().startswith(("&", "%", "/")):
+            if not linha or linha.strip().startswith(("&","%","/")):
                 continue
             campos = linha.split()
-            if not campos:
-                continue
-
-            linha_str = " ".join(campos).upper()
+            if not campos: continue
+            s = " ".join(campos).upper()
             planta_id = None
-            for planta in PLANTAS_ALVO:
-                if planta.upper() in linha_str:
-                    planta_id = "GNA II" if ("II" in planta or "2" in planta) else "GNA I"
+            for p in PLANTAS_ALVO:
+                if p.upper() in s:
+                    planta_id = "GNA II" if ("II" in p or "2" in p) else "GNA I"
                     break
-
-            if not planta_id:
-                continue
-
-            registro = {"planta_id": planta_id}
+            if not planta_id: continue
+            reg = {"planta_id": planta_id}
             for j, col in enumerate(colunas):
-                registro[col] = _parse_valor(campos[j]) if j < len(campos) else None
+                reg[col] = _parse(campos[j]) if j < len(campos) else None
             for j in range(len(colunas), len(campos)):
-                registro[f"col_{j}"] = _parse_valor(campos[j])
+                reg[f"col_{j}"] = _parse(campos[j])
+            registros.append(reg)
+            log.info(f"  -> {planta_id}: {reg}")
+    return {"colunas": colunas, "registros": registros, "raw_header": cab_raw,
+            "total_linhas_arquivo": len(linhas), "total_registros_gna": len(registros)}
 
-            registros_gna.append(registro)
-            log.info(f"  -> {planta_id}: {registro}")
+def _parse(t):
+    if not t or t in ["-","N/A","*",""]: return None
+    try: return int(t)
+    except: pass
+    try: return float(t.replace(",","."))
+    except: return t
 
-    return {
-        "colunas": colunas,
-        "registros": registros_gna,
-        "raw_header": cabecalho_raw,
-        "total_linhas_arquivo": len(linhas),
-        "total_registros_gna": len(registros_gna),
-    }
-
-
-def _parse_valor(texto):
-    if not texto or texto in ["-", "N/A", "*", ""]:
-        return None
-    try:
-        return int(texto)
-    except ValueError:
-        pass
-    try:
-        return float(texto.replace(",", "."))
-    except ValueError:
-        return texto
-
-
-def salvar_resultado(conteudo_raw, dados):
+def salvar(raw, dados):
     ts = datetime.now(timezone.utc).isoformat()
-    if conteudo_raw:
-        RAW_FILE.write_text(conteudo_raw, encoding="utf-8", errors="replace")
-    historico = []
+    if raw: RAW_FILE.write_text(raw, encoding="utf-8", errors="replace")
+    hist = []
     if JSON_FILE.exists():
-        try:
-            historico = json.loads(JSON_FILE.read_text(encoding="utf-8")).get("historico", [])
-        except Exception:
-            pass
-    historico.append({"timestamp": ts, "colunas": dados["colunas"],
-                      "registros": dados["registros"], "total": dados["total_registros_gna"]})
-    historico = historico[-288:]
-    saida = {
-        "ultima_coleta": ts,
-        "status": "ok" if dados["registros"] else "sem_dados",
-        "arquivo": ARQUIVO_DAT,
-        "colunas": dados["colunas"],
-        "raw_header": dados["raw_header"],
-        "total_linhas_arquivo": dados["total_linhas_arquivo"],
-        "registros": dados["registros"],
-        "total_registros_gna": dados["total_registros_gna"],
-        "historico": historico,
-    }
+        try: hist = json.loads(JSON_FILE.read_text()).get("historico", [])
+        except: pass
+    hist.append({"timestamp": ts, "colunas": dados["colunas"],
+                 "registros": dados["registros"], "total": dados["total_registros_gna"]})
+    hist = hist[-288:]
+    saida = {"ultima_coleta": ts, "status": "ok" if dados["registros"] else "sem_dados",
+             "arquivo": ARQUIVO_DAT, "colunas": dados["colunas"], "raw_header": dados["raw_header"],
+             "total_linhas_arquivo": dados["total_linhas_arquivo"],
+             "registros": dados["registros"], "total_registros_gna": dados["total_registros_gna"],
+             "historico": hist}
     JSON_FILE.write_text(json.dumps(saida, ensure_ascii=False, indent=2), encoding="utf-8")
-    log.info(f"JSON salvo: {dados['total_registros_gna']} registros GNA")
+    log.info(f"Salvo: {dados['total_registros_gna']} registros")
     return saida
-
 
 def main():
     if not ONS_PASS:
         log.error("ONS_PASS nao definido!")
-        erro = {"ultima_coleta": datetime.now(timezone.utc).isoformat(),
-                "status": "erro_credencial", "colunas": [], "registros": [], "historico": []}
-        JSON_FILE.write_text(json.dumps(erro, ensure_ascii=False, indent=2), encoding="utf-8")
+        JSON_FILE.write_text(json.dumps({"ultima_coleta": datetime.now(timezone.utc).isoformat(),
+            "status": "erro_credencial", "colunas": [], "registros": [], "historico": []}), encoding="utf-8")
         return 1
-
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
-        )
-        context = browser.new_context(
-            viewport={"width": 1600, "height": 900},
-            locale="pt-BR",
-            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        )
-        page = context.new_page()
+        browser = pw.chromium.launch(headless=True,
+            args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"])
+        page = browser.new_context(viewport={"width":1600,"height":900}, locale="pt-BR",
+            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+        ).new_page()
         try:
             fazer_login(page)
             url_zip = encontrar_zip_mais_recente(page)
             if not url_zip:
                 log.error("ZIP nao encontrado.")
-                salvar_resultado("", {"colunas": [], "registros": [], "raw_header": "",
-                                      "total_linhas_arquivo": 0, "total_registros_gna": 0})
+                salvar("", {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0})
                 return 1
-            conteudo_raw = baixar_zip_e_extrair_dat(page, url_zip)
-            if not conteudo_raw:
-                log.error("Nao foi possivel extrair o .dat.")
-                salvar_resultado("", {"colunas": [], "registros": [], "raw_header": "",
-                                      "total_linhas_arquivo": 0, "total_registros_gna": 0})
+            raw = baixar_zip_e_extrair_dat(page, url_zip)
+            if not raw:
+                log.error("Falha ao extrair DAT.")
+                salvar("", {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0})
                 return 1
-            dados = parsear_dat(conteudo_raw)
-            salvar_resultado(conteudo_raw, dados)
-            log.info(f"Concluido: {dados['total_registros_gna']} registros GNA.")
+            dados = parsear_dat(raw)
+            salvar(raw, dados)
+            log.info(f"Concluido: {dados['total_registros_gna']} registros.")
             return 0
         except Exception as e:
-            log.error(f"Erro fatal: {e}", exc_info=True)
+            log.error(f"Erro: {e}", exc_info=True)
             return 1
         finally:
             browser.close()
-
 
 if __name__ == "__main__":
     exit(main())
