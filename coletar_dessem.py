@@ -53,6 +53,122 @@ def enviar_email(assunto, corpo_html):
         log.error(f"Erro email: {e}")
 
 
+def enviar_relatorio_diario(dados_dat, dados_pdpw):
+    """Envia email com resumo dos dados coletados hoje."""
+    if not EMAIL_PASS:
+        log.warning("EMAIL_PASS nao configurado - email nao enviado.")
+        return
+
+    ts = datetime.now(timezone.utc).astimezone().strftime("%d/%m/%Y %H:%M")
+    registros_dat = dados_dat.get("registros", [])
+    registros_pdpw = dados_pdpw.get("registros", [])
+    data_pdpw = dados_pdpw.get("data", "")
+    empresa_pdpw = dados_pdpw.get("empresa", "")
+
+    # Filtra apenas registros de hoje
+    hoje = datetime.now().strftime("%d/%m/%Y")
+
+    # ── Tabela DAT ────────────────────────────────────────────
+    colunas_dat = dados_dat.get("colunas", [])
+    linhas_dat = ""
+    for reg in registros_dat:
+        planta = reg.get("planta_id", "")
+        cor = "#00c8ff" if planta == "GNA I" else "#ffaa00"
+        cells = f"<td style='padding:6px 10px;border-bottom:1px solid #1e3a5f;color:{cor};font-weight:bold'>{planta}</td>"
+        for col in colunas_dat:
+            val = reg.get(col, "")
+            val_fmt = f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if isinstance(val, float) else (str(val) if val is not None else "-")
+            cells += f"<td style='padding:6px 10px;border-bottom:1px solid #1e3a5f;text-align:right'>{val_fmt}</td>"
+        linhas_dat += f"<tr>{cells}</tr>"
+
+    header_dat = "<th style='padding:7px 10px;background:#111d2e;text-align:left'>PLANTA</th>"
+    for col in colunas_dat:
+        header_dat += f"<th style='padding:7px 10px;background:#111d2e;text-align:right'>{col}</th>"
+
+    # ── Tabela PDPW ───────────────────────────────────────────
+    colunas_pdpw = dados_pdpw.get("colunas", [])
+    excluir = ["data_pdpw", "empresa", "data", "intervalo"]
+    colunas_pdpw_exib = [c for c in colunas_pdpw if not any(ex in c.lower() for ex in excluir)]
+
+    linhas_pdpw = ""
+    for reg in registros_pdpw[:48]:
+        cells = ""
+        for col in colunas_pdpw_exib:
+            val = reg.get(col, "")
+            val_fmt = f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if isinstance(val, float) else (str(val) if val is not None else "-")
+            cells += f"<td style='padding:5px 10px;border-bottom:1px solid #1e3a5f;text-align:right;font-size:11px'>{val_fmt}</td>"
+        linhas_pdpw += f"<tr>{cells}</tr>"
+
+    header_pdpw = ""
+    for col in colunas_pdpw_exib:
+        header_pdpw += f"<th style='padding:6px 10px;background:#111d2e;text-align:right;font-size:10px'>{col}</th>"
+
+    corpo_html = f"""
+<div style="background:#090d12;padding:24px;font-family:Arial,sans-serif;color:#c8dff5;max-width:1000px">
+
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#0a1825,#0d2040);border-left:4px solid #00c8ff;padding:16px 20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-family:'Barlow Condensed',Arial;font-weight:900;font-size:20px;color:#fff;letter-spacing:2px;text-transform:uppercase">GNA GERACAO - RELATORIO DESSEM</div>
+      <div style="font-size:11px;color:#6a8faf;margin-top:4px;font-family:monospace">Coleta: {ts} &nbsp;|&nbsp; Data PDPW: {data_pdpw} &nbsp;|&nbsp; Empresa: {empresa_pdpw}</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#0080cc,#00c8ff);padding:10px 16px;font-weight:900;font-size:16px;color:#000;font-family:Arial">GNA</div>
+  </div>
+
+  <!-- Cards de resumo -->
+  <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+    <div style="background:#0d1520;border:1px solid #1e3a5f;padding:12px 18px;flex:1;min-width:140px">
+      <div style="font-size:10px;color:#3d5a78;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">Registros DAT</div>
+      <div style="font-size:20px;color:#00c8ff;font-family:monospace;font-weight:bold">{len(registros_dat)}</div>
+    </div>
+    <div style="background:#0d1520;border:1px solid #1e3a5f;padding:12px 18px;flex:1;min-width:140px">
+      <div style="font-size:10px;color:#3d5a78;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">GNA I</div>
+      <div style="font-size:20px;color:#00c8ff;font-family:monospace;font-weight:bold">{sum(1 for r in registros_dat if r.get('planta_id')=='GNA I')}</div>
+    </div>
+    <div style="background:#0d1520;border:1px solid #1e3a5f;padding:12px 18px;flex:1;min-width:140px">
+      <div style="font-size:10px;color:#3d5a78;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">GNA II</div>
+      <div style="font-size:20px;color:#ffaa00;font-family:monospace;font-weight:bold">{sum(1 for r in registros_dat if r.get('planta_id')=='GNA II')}</div>
+    </div>
+    <div style="background:#0d1520;border:1px solid #1e3a5f;padding:12px 18px;flex:1;min-width:140px">
+      <div style="font-size:10px;color:#3d5a78;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">PDO Term</div>
+      <div style="font-size:20px;color:#cc88ff;font-family:monospace;font-weight:bold">{len(registros_pdpw)}</div>
+    </div>
+  </div>
+
+  <!-- Tabela DAT -->
+  <div style="margin-bottom:20px">
+    <div style="font-size:12px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:#00c8ff;border-left:3px solid #00c8ff;padding-left:10px;margin-bottom:10px">PDO OPER TERM - GNA GERACAO</div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:12px">
+        <thead><tr>{header_dat}</tr></thead>
+        <tbody>{linhas_dat if linhas_dat else "<tr><td colspan='10' style='padding:12px;color:#3d5a78;text-align:center'>Sem dados</td></tr>"}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tabela PDPW -->
+  <div style="margin-bottom:20px">
+    <div style="font-size:12px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:#cc88ff;border-left:3px solid #cc88ff;padding-left:10px;margin-bottom:10px">PDO TERM - COMENTARIOS DESSEM ({data_pdpw})</div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:11px">
+        <thead><tr>{header_pdpw if header_pdpw else "<th style='padding:6px 10px;background:#111d2e'>-</th>"}</tr></thead>
+        <tbody>{linhas_pdpw if linhas_pdpw else "<tr><td colspan='10' style='padding:12px;color:#3d5a78;text-align:center'>Sem dados</td></tr>"}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Link dashboard -->
+  <div style="border-top:1px solid #1e3a5f;padding-top:14px;font-size:11px;color:#6a8faf">
+    <a href="https://leandrosouza1234561.github.io/gna_dessem4/" style="color:#00c8ff;text-decoration:none">Ver dashboard completo →</a>
+    &nbsp;&nbsp;|&nbsp;&nbsp; GNA MONITOR · AUTO-REFRESH 5min · GITHUB ACTIONS
+  </div>
+</div>"""
+
+    assunto = f"GNA GERACAO - Relatorio DESSEM {hoje} | {len(registros_dat)} DAT + {len(registros_pdpw)} PDPW"
+    enviar_email(assunto, corpo_html)
+    log.info(f"Relatorio diario enviado: {assunto}")
+
+
 def verificar_e_alertar(registros):
     alertas = []
     for reg in registros:
@@ -473,7 +589,10 @@ def salvar(conteudo_raw, dados_dat, dados_pdpw):
         f"Salvo: {dados_dat['total_registros_gna']} registros DAT + "
         f"{len(dados_pdpw.get('registros', []))} registros PDPW"
     )
+    # Envia alertas se houver valores != 0
     verificar_e_alertar(dados_dat["registros"])
+    # Envia relatorio diario com todos os dados
+    enviar_relatorio_diario(dados_dat, dados_pdpw)
     return saida
 
 
