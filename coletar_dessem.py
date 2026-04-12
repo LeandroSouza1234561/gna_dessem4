@@ -1,7 +1,4 @@
-"""
-GNA I & II — Coleta pdo_oper_titulacao_usinas.dat — ONS/SINTEGRE
-"""
-import json, logging, os, re, time, zipfile, io
+import json, logging, os, re, time, zipfile, io, tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
@@ -9,8 +6,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 ONS_USER = os.environ.get("ONS_USER", "")
 ONS_PASS = os.environ.get("ONS_PASS", "")
 URL_PORTAL   = "https://pops.ons.org.br/"
-URL_SINTEGRE = "https://sintegre.ons.org.br/"
-BASE_DOWN    = "https://sintegre.ons.org.br/sites/9/51/_layouts/download.aspx?SourceUrl=/sites/9/51/Produtos/277/"
+URL_HISTORICO = "https://sintegre.ons.org.br/sites/9/51//paginas/servicos/historico-de-produtos.aspx?produto=Decks%20de%20entrada%20e%20sa%C3%ADda%20-%20Modelo%20DESSEM"
 ARQUIVO_DAT  = "pdo_oper_titulacao_usinas.dat"
 PLANTAS_ALVO = ["GNA I","GNA II","GNA 1","GNA 2","GNAI","GNAII","UTE GNA"]
 DOCS_DIR  = Path(__file__).parent / "docs"
@@ -19,34 +15,6 @@ RAW_FILE  = DOCS_DIR / "pdo_oper_titulacao_usinas.dat"
 DOCS_DIR.mkdir(exist_ok=True)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("GNA-DAT")
-
-def fazer_login_pops(page):
-    log.info("Login POPS...")
-    page.goto(URL_PORTAL, wait_until="domcontentloaded")
-    time.sleep(3)
-    if "sso.ons.org.br" in page.url or "login" in page.url.lower():
-        _credenciais(page)
-    try:
-        page.wait_for_url("**/pops.ons.org.br/**", timeout=60000)
-        log.info("Autenticado POPS.")
-    except PWTimeout:
-        log.warning("Timeout POPS.")
-    time.sleep(2)
-
-def fazer_login_sintegre(page):
-    log.info("Acessando SINTEGRE...")
-    page.goto(URL_SINTEGRE, wait_until="domcontentloaded", timeout=30000)
-    time.sleep(3)
-    # Se redirecionar para SSO, preenche credenciais novamente
-    if "sso.ons.org.br" in page.url or "login" in page.url.lower():
-        log.info("SSO SINTEGRE — preenchendo credenciais...")
-        _credenciais(page)
-        try:
-            page.wait_for_url("**/sintegre.ons.org.br/**", timeout=40000)
-        except PWTimeout:
-            log.warning("Timeout SINTEGRE.")
-    log.info(f"SINTEGRE URL: {page.url}")
-    time.sleep(2)
 
 def _credenciais(page):
     for sel in ["input[name='username']","input[type='email']","#i0116"]:
@@ -69,45 +37,76 @@ def _credenciais(page):
         except: continue
     time.sleep(3)
 
-def gerar_urls_tentativa():
-    """Gera lista de URLs candidatas baseadas na data atual."""
-    now = datetime.now()
-    mes  = str(now.month).zfill(2)
-    ano  = str(now.year)
-    dia  = now.day
-    urls = []
-    # Tenta revisões de 1 a 5, dias de hoje até 3 dias atrás
-    for d in range(dia, max(dia-4, 0), -1):
-        for rev in range(5, 0, -1):
-            nome = f"DS_ONS_{mes}{ano}_RV{rev}D{d}.zip"
-            urls.append((nome, BASE_DOWN + nome))
-    return urls
-
-def baixar_zip(page, url, nome):
-    log.info(f"Tentando: {nome}")
-    resultado = page.evaluate(f"""
-        async () => {{
-            try {{
-                const resp = await fetch('{url}', {{credentials:'include', redirect:'follow'}});
-                if (!resp.ok) return {{erro: 'HTTP '+resp.status}};
-                const buf = await resp.arrayBuffer();
-                if (buf.byteLength < 1000) return {{erro: 'Arquivo muito pequeno: '+buf.byteLength}};
-                return {{bytes: Array.from(new Uint8Array(buf))}};
-            }} catch(e) {{ return {{erro: e.toString()}}; }}
-        }}
-    """)
-    if not resultado or "erro" in resultado:
-        return None
-    zip_bytes = bytes(resultado["bytes"])
-    log.info(f"ZIP OK: {len(zip_bytes)} bytes")
+def fazer_login(page):
+    log.info("Login POPS...")
+    page.goto(URL_PORTAL, wait_until="domcontentloaded")
+    time.sleep(3)
+    if "sso.ons.org.br" in page.url or "login" in page.url.lower():
+        _credenciais(page)
     try:
-        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+        page.wait_for_url("**/pops.ons.org.br/**", timeout=60000)
+        log.info("Autenticado POPS.")
+    except PWTimeout:
+        log.warning("Timeout POPS.")
+    time.sleep(2)
+
+def baixar_zip_playwright(context, download_dir):
+    """Abre nova página, navega até histórico e clica no botão Baixar."""
+    page = context.new_page()
+    try:
+        log.info("Acessando historico SINTEGRE...")
+        page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=40000)
+        time.sleep(4)
+
+        # Se redirecionou para SSO
+        if "sso.ons.org.br" in page.url or "login" in page.url.lower():
+            log.info("SSO SINTEGRE — fazendo login...")
+            _credenciais(page)
+            page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
+            time.sleep(4)
+
+        log.info(f"Pagina historico: {page.url}")
+
+        # Clica no primeiro botão Baixar e captura o download
+        with page.expect_download(timeout=60000) as download_info:
+            # Tenta botões com texto "Baixar"
+            botoes = page.locator("a:has-text('Baixar'), button:has-text('Baixar'), input[value='Baixar']").all()
+            log.info(f"Botoes Baixar encontrados: {len(botoes)}")
+            if botoes:
+                botoes[0].click()
+            else:
+                # Tenta pela classe do botão laranja
+                botoes2 = page.locator(".default_btn, .btn-download, a[class*='btn']").all()
+                log.info(f"Botoes alternativos: {len(botoes2)}")
+                if botoes2:
+                    botoes2[0].click()
+                else:
+                    log.error("Nenhum botao de download encontrado.")
+                    return None
+
+        download = download_info.value
+        zip_path = Path(download_dir) / "deck_dessem.zip"
+        download.save_as(zip_path)
+        log.info(f"ZIP baixado: {zip_path} ({zip_path.stat().st_size} bytes)")
+        return zip_path
+
+    except Exception as e:
+        log.error(f"Erro download Playwright: {e}")
+        return None
+    finally:
+        page.close()
+
+def extrair_dat(zip_path):
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
             arquivos = zf.namelist()
-            log.info(f"Conteudo: {arquivos}")
+            log.info(f"Conteudo ZIP: {arquivos}")
             dat = next((n for n in arquivos if ARQUIVO_DAT.lower() in n.lower()), None)
             if not dat: dat = next((n for n in arquivos if "pdo_oper" in n.lower()), None)
             if not dat: dat = next((n for n in arquivos if n.lower().endswith(".dat")), None)
-            if not dat: return None
+            if not dat:
+                log.error(f"DAT nao encontrado: {arquivos}")
+                return None
             log.info(f"Extraindo: {dat}")
             return zf.read(dat).decode("latin-1", errors="replace")
     except Exception as e:
@@ -188,35 +187,41 @@ def main():
     if not ONS_PASS:
         log.error("ONS_PASS nao definido!")
         return 1
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True,
-            args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"])
-        page = browser.new_context(
-            viewport={"width":1600,"height":900}, locale="pt-BR",
-            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
-        ).new_page()
-        try:
-            fazer_login_pops(page)
-            fazer_login_sintegre(page)
-            raw = None
-            for nome, url in gerar_urls_tentativa():
-                raw = baixar_zip(page, url, nome)
-                if raw:
-                    log.info(f"ZIP encontrado: {nome}")
-                    break
-            if not raw:
-                log.error("Nenhum ZIP funcionou.")
-                salvar("", {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0})
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True,
+                args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"])
+            context = browser.new_context(
+                viewport={"width":1600,"height":900}, locale="pt-BR",
+                user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+                accept_downloads=True
+            )
+            try:
+                page = context.new_page()
+                fazer_login(page)
+                page.close()
+
+                zip_path = baixar_zip_playwright(context, tmpdir)
+                if not zip_path:
+                    log.error("Download falhou.")
+                    salvar("", {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0})
+                    return 1
+
+                raw = extrair_dat(zip_path)
+                if not raw:
+                    log.error("Falha ao extrair DAT.")
+                    salvar("", {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0})
+                    return 1
+
+                dados = parsear_dat(raw)
+                salvar(raw, dados)
+                log.info(f"Concluido: {dados['total_registros_gna']} registros.")
+                return 0
+            except Exception as e:
+                log.error(f"Erro: {e}", exc_info=True)
                 return 1
-            dados = parsear_dat(raw)
-            salvar(raw, dados)
-            log.info(f"Concluido: {dados['total_registros_gna']} registros.")
-            return 0
-        except Exception as e:
-            log.error(f"Erro: {e}", exc_info=True)
-            return 1
-        finally:
-            browser.close()
+            finally:
+                browser.close()
 
 if __name__ == "__main__":
     exit(main())
