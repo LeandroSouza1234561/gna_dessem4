@@ -1,4 +1,4 @@
-# GNA Monitor — PDO Oper Titulação Usinas · DESSEM / ONS
+# GNA Monitor — DESSEM / ONS
 
 Coleta automática do arquivo `pdo_oper_titulacao_usinas.dat` do portal SINTEGRE/ONS,
 filtrado para **GNA I** e **GNA II**, com dashboard publicado via **GitHub Pages**.
