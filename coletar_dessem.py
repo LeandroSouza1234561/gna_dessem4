@@ -56,20 +56,38 @@ def login_e_baixar(tmpdir):
             log.info("Acessando historico SINTEGRE...")
             page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
             time.sleep(4)
+            log.info(f"URL apos goto: {page.url}")
+
+            # Se redirecionou para SSO, faz login
             if "sso.ons.org.br" in page.url:
                 ok = fazer_login_keycloak(page)
                 if not ok: return None
-                if "historico-de-produtos" not in page.url:
-                    page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
-                    time.sleep(4)
+                time.sleep(3)
+
+            # Sempre navega de volta para o historico apos login
+            if "historico-de-produtos" not in page.url:
+                log.info("Navegando para historico SINTEGRE...")
+                page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
+                time.sleep(5)
+                log.info(f"URL historico: {page.url}")
+
+            # Se ainda redirecionou para SSO (segunda tentativa)
+            if "sso.ons.org.br" in page.url:
+                ok = fazer_login_keycloak(page)
+                if not ok: return None
+                page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
+                time.sleep(5)
+
             try:
-                log.info(f"Pagina: {page.title()}")
+                log.info(f"Pagina final: {page.title()} | {page.url}")
             except Exception:
-                log.info(f"Pagina URL: {page.url}")
+                log.info(f"URL final: {page.url}")
+
             botoes = page.locator("a:has-text('Baixar'), button:has-text('Baixar')").all()
             log.info(f"Botoes Baixar: {len(botoes)}")
             if not botoes:
                 log.error("Botao nao encontrado.")
+                log.info(f"HTML preview: {page.content()[:500]}")
                 return None
             with page.expect_download(timeout=120000) as dl:
                 botoes[0].click()
