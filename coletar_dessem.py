@@ -276,19 +276,36 @@ def coletar_tudo(tmpdir):
                 if len(linhas) < 2:
                     continue
 
-                # Cabeçalho — pode ter 1 ou 2 linhas de header
-                cab1 = [
-                    c.inner_text().strip()
-                    for c in linhas[0].locator("th,td").all()
-                ]
-                cab2 = [
-                    c.inner_text().strip()
-                    for c in linhas[1].locator("th,td").all()
-                ]
+                def _limpar_celula(texto):
+                    """Remove \t, \n e espaços extras; expande tabs em múltiplas colunas."""
+                    return [p.strip() for p in re.split(r'[\t\n]+', texto) if p.strip()]
 
+                def _extrair_cabecalho(linha_el):
+                    """Extrai células do cabeçalho, expandindo tabs como colunas extras."""
+                    cols = []
+                    for cel in linha_el.locator("th,td").all():
+                        partes = _limpar_celula(cel.inner_text())
+                        cols.extend(partes if partes else [""])
+                    return cols
+
+                def _extrair_celulas(linha_el):
+                    """Extrai células de dados, expandindo tabs como colunas extras."""
+                    cols = []
+                    for cel in linha_el.locator("td").all():
+                        partes = _limpar_celula(cel.inner_text())
+                        cols.extend(partes if partes else [""])
+                    return cols
+
+                # Cabeçalho — pode ter 1 ou 2 linhas de header
+                cab1 = _extrair_cabecalho(linhas[0])
+                cab2 = _extrair_cabecalho(linhas[1])
+
+                SUBHEADER_KEYWORDS = {
+                    "dessem", "sugerido", "total", "intervalo",
+                    "programado", "meia hora", "ggna", "ggna2",
+                }
                 eh_subheader = any(
-                    c in ["DESSEM", "Sugerido", "Total", "Intervalo", "Programado", "Meia Hora"]
-                    for c in cab2
+                    c.lower() in SUBHEADER_KEYWORDS for c in cab2
                 )
 
                 if eh_subheader:
@@ -307,14 +324,11 @@ def coletar_tudo(tmpdir):
                     colunas_pdpw = cab1
                     inicio = 1
 
-                log.info(f"Colunas PDPW: {colunas_pdpw}")
+                log.info(f"Colunas PDPW ({len(colunas_pdpw)}): {colunas_pdpw}")
 
                 regs = []
                 for linha in linhas[inicio:]:
-                    celulas = [
-                        c.inner_text().strip()
-                        for c in linha.locator("td").all()
-                    ]
+                    celulas = _extrair_celulas(linha)
                     if not celulas or len(celulas) < 2:
                         continue
 
@@ -508,7 +522,7 @@ def salvar(conteudo_raw, dados_dat, dados_pdpw):
         "colunas":   dados_dat["colunas"],
         "registros": dados_dat["registros"],
         "total":     dados_dat["total_registros_gna"],
-        "pdpw":      dados_pdpw,
+        "pdo_term":      dados_pdpw,
     }
     hist.append(snapshot)
 
@@ -521,7 +535,7 @@ def salvar(conteudo_raw, dados_dat, dados_pdpw):
         "total_linhas_arquivo":  dados_dat["total_linhas_arquivo"],
         "registros":             dados_dat["registros"],
         "total_registros_gna":   dados_dat["total_registros_gna"],
-        "pdpw":                  dados_pdpw,
+        "pdo_term":                  dados_pdpw,
         "historico":             hist[-288:],
     }
 
