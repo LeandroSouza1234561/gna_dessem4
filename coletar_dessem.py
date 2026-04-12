@@ -58,13 +58,11 @@ def verificar_e_alertar(registros):
         for col in COLUNAS_ALERTA:
             val = reg.get(col)
             if val is not None and isinstance(val, (int, float)) and val != 0:
-                alertas.append({"planta": reg.get("planta_id",""), "iper": reg.get("IPER",""),
-                                 "coluna": col, "valor": val})
+                alertas.append({"planta": reg.get("planta_id",""), "iper": reg.get("IPER",""), "coluna": col, "valor": val})
     if not alertas:
         log.info("Sem alertas.")
         return
     ts = datetime.now(timezone.utc).astimezone().strftime("%d/%m/%Y %H:%M")
-    assunto = f"⚡ GNA Alert — Valores detectados ({ts})"
     linhas = "".join(f"<tr><td style='padding:6px 12px;border-bottom:1px solid #1e3a5f;color:{'#00c8ff' if a['planta']=='GNA I' else '#ffaa00'}'>{a['planta']}</td><td style='padding:6px 12px;border-bottom:1px solid #1e3a5f'>{a['iper']}</td><td style='padding:6px 12px;border-bottom:1px solid #1e3a5f;color:#ffaa00'>{a['coluna']}</td><td style='padding:6px 12px;border-bottom:1px solid #1e3a5f;color:#00e57a;text-align:right'>{a['valor']:,.2f}</td></tr>" for a in alertas[:100])
     corpo_html = f"""<div style="background:#090d12;padding:24px;font-family:Arial;color:#c8dff5;max-width:800px">
       <div style="background:#0d2040;border-left:4px solid #00c8ff;padding:14px 20px;margin-bottom:20px">
@@ -77,7 +75,7 @@ def verificar_e_alertar(registros):
       </table>
       <div style="margin-top:20px"><a href="https://leandrosouza1234561.github.io/gna_dessem4/" style="color:#00c8ff">→ Ver dashboard</a></div>
     </div>"""
-    enviar_email(assunto, corpo_html)
+    enviar_email(f"⚡ GNA Alert — Valores detectados ({ts})", corpo_html)
 
 
 def fazer_login_keycloak(page):
@@ -100,145 +98,133 @@ def fazer_login_keycloak(page):
         log.error(f"Erro login: {e}"); return False
 
 
-def login_e_baixar(tmpdir):
-    """Login no SINTEGRE e baixa o ZIP do DESSEM."""
+def coletar_tudo(tmpdir):
+    """Abre UMA sessão do browser e faz tudo: baixa ZIP + coleta PDPW."""
+    zip_path    = None
+    dados_pdpw  = {"colunas": [], "registros": []}
+
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True,
             args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"])
         context = browser.new_context(
             viewport={"width":1600,"height":900}, locale="pt-BR", accept_downloads=True,
             user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
-        page = context.new_page()
+
         try:
+            # ── 1. Baixa ZIP do SINTEGRE ──────────────────────────────
+            page = context.new_page()
             log.info("Acessando historico SINTEGRE...")
             page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
             time.sleep(4)
             if "sso.ons.org.br" in page.url:
-                if not fazer_login_keycloak(page): return None, context
+                if not fazer_login_keycloak(page):
+                    page.close(); return zip_path, dados_pdpw
                 time.sleep(3)
             if "historico-de-produtos" not in page.url:
                 page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
                 time.sleep(5)
             if "sso.ons.org.br" in page.url:
-                if not fazer_login_keycloak(page): return None, context
+                if not fazer_login_keycloak(page):
+                    page.close(); return zip_path, dados_pdpw
                 page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
                 time.sleep(5)
             botoes = page.locator("a:has-text('Baixar'), button:has-text('Baixar')").all()
             log.info(f"Botoes Baixar: {len(botoes)}")
-            if not botoes:
-                log.error("Botao nao encontrado."); return None, context
-            with page.expect_download(timeout=120000) as dl:
-                botoes[0].click()
-            zip_path = Path(tmpdir) / "deck.zip"
-            dl.value.save_as(zip_path)
-            log.info(f"ZIP: {zip_path.stat().st_size} bytes")
-            return zip_path, context
-        except Exception as e:
-            log.error(f"Erro: {e}", exc_info=True)
-            return None, context
-        finally:
+            if botoes:
+                with page.expect_download(timeout=120000) as dl:
+                    botoes[0].click()
+                zip_path = Path(tmpdir) / "deck.zip"
+                dl.value.save_as(zip_path)
+                log.info(f"ZIP: {zip_path.stat().st_size} bytes")
+            else:
+                log.error("Botao nao encontrado.")
             page.close()
 
-
-def coletar_pdpw(context):
-    """Acessa PDPW e extrai tabela de comentários DESSEM para GNA GERAÇÃO."""
-    page = context.new_page()
-    try:
-        log.info("Acessando PDPW...")
-        page.goto(URL_PDPW, wait_until="domcontentloaded", timeout=30000)
-        time.sleep(4)
-
-        # Login se necessário
-        if "sso.ons.org.br" in page.url or "login" in page.url.lower():
-            if not fazer_login_keycloak(page): return []
-            page.goto(URL_PDPW, wait_until="domcontentloaded", timeout=30000)
+            # ── 2. Coleta PDPW ────────────────────────────────────────
+            log.info("Acessando PDPW...")
+            page2 = context.new_page()
+            page2.goto(URL_PDPW, wait_until="domcontentloaded", timeout=30000)
             time.sleep(4)
+            if "sso.ons.org.br" in page2.url or "login" in page2.url.lower():
+                if not fazer_login_keycloak(page2):
+                    page2.close()
+                    return zip_path, dados_pdpw
+                page2.goto(URL_PDPW, wait_until="domcontentloaded", timeout=30000)
+                time.sleep(4)
+            log.info(f"PDPW URL: {page2.url}")
 
-        log.info(f"PDPW URL: {page.url}")
-
-        # Seleciona empresa GNA GERAÇÃO
-        try:
-            select_empresa = page.locator("select").filter(has_text="").nth(1)
-            # Tenta pelo label Empresa
-            empresa_sel = page.locator("select[name*='mpresa'], select[id*='mpresa'], select[id*='Empresa']").first
-            empresa_sel.wait_for(timeout=10000)
-            empresa_sel.select_option(label="GNA GERAÇÃO")
-            log.info("Empresa GNA GERAÇÃO selecionada.")
-            time.sleep(3)
-        except Exception as e:
-            log.warning(f"Erro ao selecionar empresa: {e}")
-            # Tenta selecionar pelo valor
+            # Seleciona empresa GNA GERAÇÃO
             try:
-                selects = page.locator("select").all()
+                selects = page2.locator("select").all()
                 for sel in selects:
-                    options = sel.locator("option").all()
-                    for opt in options:
-                        if "GNA" in (opt.inner_text() or "").upper():
-                            sel.select_option(label=opt.inner_text().strip())
-                            log.info(f"Empresa selecionada: {opt.inner_text()}")
-                            time.sleep(3)
+                    opts = sel.locator("option").all()
+                    for opt in opts:
+                        txt = opt.inner_text().strip()
+                        if "GNA" in txt.upper() and "GERA" in txt.upper():
+                            sel.select_option(label=txt)
+                            log.info(f"Empresa selecionada: {txt}")
+                            time.sleep(4)
                             break
-            except Exception as e2:
-                log.error(f"Erro select empresa fallback: {e2}")
+            except Exception as e:
+                log.warning(f"Erro select empresa: {e}")
 
-        # Aguarda tabela carregar
-        time.sleep(3)
-
-        # Extrai tabela com 48 meias horas
-        registros = []
-        tabelas = page.locator("table").all()
-        log.info(f"Tabelas encontradas: {len(tabelas)}")
-
-        for tabela in tabelas:
-            html = tabela.inner_html()
-            if "GGNA" in html or "Intervalo" in html or "00:00" in html:
-                log.info("Tabela PDPW encontrada!")
-                linhas = tabela.locator("tr").all()
-
-                # Extrai cabeçalho
-                cabecalho = []
-                for cell in linhas[0].locator("th, td").all():
-                    cabecalho.append(cell.inner_text().strip())
-                log.info(f"Cabecalho PDPW: {cabecalho}")
-
-                # Extrai subheader se existir
-                subheader = []
-                if len(linhas) > 1:
-                    for cell in linhas[1].locator("th, td").all():
-                        subheader.append(cell.inner_text().strip())
-
-                # Monta colunas combinadas
-                colunas_pdpw = []
-                for i, h in enumerate(cabecalho):
-                    if h and h not in ["", " "]:
-                        colunas_pdpw.append(h)
-                    elif i < len(subheader) and subheader[i]:
-                        colunas_pdpw.append(subheader[i])
-                    else:
-                        colunas_pdpw.append(f"col_{i}")
-
-                # Extrai dados
-                inicio = 2 if subheader else 1
-                for linha in linhas[inicio:]:
-                    celulas = [c.inner_text().strip() for c in linha.locator("td").all()]
-                    if not celulas or len(celulas) < 2:
+            # Extrai tabela
+            tabelas = page2.locator("table").all()
+            log.info(f"Tabelas PDPW: {len(tabelas)}")
+            for tabela in tabelas:
+                html = tabela.inner_html()
+                if "GGNA" in html or "00:00" in html or "Intervalo" in html:
+                    log.info("Tabela PDPW encontrada!")
+                    linhas = tabela.locator("tr").all()
+                    if len(linhas) < 2:
                         continue
-                    reg = {}
-                    for j, col in enumerate(colunas_pdpw):
-                        reg[col] = _parse(celulas[j]) if j < len(celulas) else None
-                    registros.append(reg)
 
-                log.info(f"PDPW: {len(registros)} registros extraidos")
-                return {"colunas": colunas_pdpw, "registros": registros}
+                    # Cabeçalho (pode ter 2 linhas de header)
+                    cab1 = [c.inner_text().strip() for c in linhas[0].locator("th,td").all()]
+                    cab2 = [c.inner_text().strip() for c in linhas[1].locator("th,td").all()]
 
-        log.warning("Tabela PDPW nao encontrada.")
-        return {"colunas": [], "registros": []}
+                    # Decide se cab2 é subheader ou dado
+                    eh_subheader = any(c in ["DESSEM","Sugerido","Total","Intervalo"] for c in cab2)
+                    if eh_subheader:
+                        # Monta colunas combinando cab1 + cab2
+                        colunas_pdpw = []
+                        for i in range(max(len(cab1), len(cab2))):
+                            c1 = cab1[i] if i < len(cab1) else ""
+                            c2 = cab2[i] if i < len(cab2) else ""
+                            if c1 and c2 and c1 != c2:
+                                colunas_pdpw.append(f"{c1} {c2}".strip())
+                            elif c1:
+                                colunas_pdpw.append(c1)
+                            else:
+                                colunas_pdpw.append(c2)
+                        inicio = 2
+                    else:
+                        colunas_pdpw = cab1
+                        inicio = 1
 
-    except Exception as e:
-        log.error(f"Erro PDPW: {e}", exc_info=True)
-        return {"colunas": [], "registros": []}
-    finally:
-        page.close()
+                    log.info(f"Colunas PDPW: {colunas_pdpw}")
+
+                    regs = []
+                    for linha in linhas[inicio:]:
+                        celulas = [c.inner_text().strip() for c in linha.locator("td").all()]
+                        if not celulas or len(celulas) < 2: continue
+                        reg = {}
+                        for j, col in enumerate(colunas_pdpw):
+                            reg[col] = _parse(celulas[j]) if j < len(celulas) else None
+                        regs.append(reg)
+
+                    dados_pdpw = {"colunas": colunas_pdpw, "registros": regs}
+                    log.info(f"PDPW: {len(regs)} registros extraidos")
+                    break
+
+            page2.close()
+
+        except Exception as e:
+            log.error(f"Erro geral: {e}", exc_info=True)
+        finally:
+            browser.close()
+
+    return zip_path, dados_pdpw
 
 
 def extrair_dat(zip_path):
@@ -250,7 +236,7 @@ def extrair_dat(zip_path):
                 conteudo = zf.read(encontrado).decode("latin-1", errors="replace")
                 log.info(f"Extraido: {encontrado}")
                 return conteudo
-            log.warning(f"Nao encontrado: {ARQUIVO_DAT}. Arquivos: {arquivos}")
+            log.warning(f"Nao encontrado: {ARQUIVO_DAT}. Arquivos: {arquivos[:10]}")
     except Exception as e:
         log.error(f"Erro ZIP: {e}")
     return None
@@ -306,7 +292,6 @@ def parsear_dat(conteudo):
             if exibir and j < len(campos):
                 reg[col_limpo] = _parse(campos[j])
         registros.append(reg)
-        log.info(f"  -> {planta_id} | barra={barra_val}: {reg}")
 
     colunas_exibir = [c.strip() for c in colunas if any(e.lower() in c.lower() or c.lower() in e.lower() for e in COLUNAS_EXIBIR)]
     log.info(f"Total GNA: {len(registros)}")
@@ -330,13 +315,9 @@ def salvar(conteudo_raw, dados_dat, dados_pdpw):
     if JSON_FILE.exists():
         try: hist = json.loads(JSON_FILE.read_text()).get("historico", [])
         except: pass
-    snapshot = {
-        "timestamp": ts,
-        "colunas": dados_dat["colunas"],
-        "registros": dados_dat["registros"],
-        "total": dados_dat["total_registros_gna"],
-        "pdpw": dados_pdpw,
-    }
+    snapshot = {"timestamp": ts, "colunas": dados_dat["colunas"],
+                "registros": dados_dat["registros"], "total": dados_dat["total_registros_gna"],
+                "pdpw": dados_pdpw}
     hist.append(snapshot)
     saida = {
         "ultima_coleta": ts,
@@ -360,27 +341,10 @@ def main():
     if not ONS_PASS:
         log.error("ONS_PASS nao definido!"); return 1
     with tempfile.TemporaryDirectory() as tmpdir:
-        zip_path, context = login_e_baixar(tmpdir)
-
-        # Coleta PDPW usando a mesma sessão autenticada
-        dados_pdpw = {"colunas": [], "registros": []}
-        if context:
-            try:
-                dados_pdpw = coletar_pdpw(context)
-                log.info(f"PDPW: {len(dados_pdpw.get('registros',[]))} registros")
-            except Exception as e:
-                log.error(f"Erro PDPW: {e}")
-            finally:
-                try: context.browser.close()
-                except: pass
-
-        conteudo_dat = None
-        if zip_path:
-            conteudo_dat = extrair_dat(zip_path)
-
+        zip_path, dados_pdpw = coletar_tudo(tmpdir)
+        conteudo_dat = extrair_dat(zip_path) if zip_path else None
         dados_dat = parsear_dat(conteudo_dat) if conteudo_dat else {
             "colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0}
-
         salvar(conteudo_dat or "", dados_dat, dados_pdpw)
         log.info("Concluido!")
         return 0
