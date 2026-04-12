@@ -1,22 +1,109 @@
-import json, logging, os, re, time, zipfile, io, tempfile
+import json, logging, os, re, time, zipfile, io, tempfile, smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from datetime import datetime, timezone
 from pathlib import Path
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
-ONS_USER = os.environ.get("ONS_USER", "")
-ONS_PASS = os.environ.get("ONS_PASS", "")
+ONS_USER   = os.environ.get("ONS_USER", "")
+ONS_PASS   = os.environ.get("ONS_PASS", "")
+EMAIL_PASS = os.environ.get("EMAIL_PASS", "")
+EMAIL_FROM = "leandro.souza@gna.com.br"
+EMAIL_TO   = "leandro.souza@gna.com.br"
+SMTP_HOST  = "smtp.office365.com"
+SMTP_PORT  = 587
+
 URL_HISTORICO = "https://sintegre.ons.org.br/sites/9/51//paginas/servicos/historico-de-produtos.aspx?produto=Decks%20de%20entrada%20e%20sa%C3%ADda%20-%20Modelo%20DESSEM"
 
-ARQUIVOS_DAT = {
-    "pdo_oper_titulacao_usinas.dat": {"col_nome": 2},
-    "pdo_term.dat":                  {"col_nome": 3},
+ARQUIVO_DAT = "pdo_oper_term.dat"
+
+# Filtro: GNA I = USIT 137 + NumBarra 53, GNA II = USIT 238 + NumBarra 44327
+FILTRO_GNA = {
+    "GNA I":  {"usit": "137", "numbarra": "53"},
+    "GNA II": {"usit": "238", "numbarra": "44327"},
 }
-PLANTAS_ALVO = ["GNA I","GNA II","GNA 1","GNA 2","GNAI","GNAII","UTE GNA"]
+
+# Colunas a exibir no dashboard
+COLUNAS_EXIBIR = ["USIT", "Nome Usit", "NomeSist", "NumBarra", "GTER", "ClinGter", "CMO", "CMB"]
+
+# Colunas para alerta de email (valores != 0)
+COLUNAS_ALERTA = ["GTER", "ClinGter", "CMO", "CMB"]
+
 DOCS_DIR  = Path(__file__).parent / "docs"
 JSON_FILE = DOCS_DIR / "dados_gna.json"
 DOCS_DIR.mkdir(exist_ok=True)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("GNA-DAT")
+
+
+def enviar_email(assunto, corpo_html):
+    if not EMAIL_PASS:
+        log.warning("EMAIL_PASS nao configurado.")
+        return
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = assunto
+        msg["From"]    = EMAIL_FROM
+        msg["To"]      = EMAIL_TO
+        msg.attach(MIMEText(corpo_html, "html", "utf-8"))
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as smtp:
+            smtp.ehlo(); smtp.starttls()
+            smtp.login(EMAIL_FROM, EMAIL_PASS)
+            smtp.sendmail(EMAIL_FROM, EMAIL_TO, msg.as_string())
+        log.info(f"Email enviado: {assunto}")
+    except Exception as e:
+        log.error(f"Erro email: {e}")
+
+
+def verificar_e_alertar(registros):
+    alertas = []
+    for reg in registros:
+        for col in COLUNAS_ALERTA:
+            val = reg.get(col)
+            if val is not None and isinstance(val, (int, float)) and val != 0:
+                alertas.append({
+                    "planta": reg.get("planta_id",""),
+                    "iper":   reg.get("IPER",""),
+                    "unidt":  reg.get("UNIDT",""),
+                    "coluna": col,
+                    "valor":  val,
+                })
+    if not alertas:
+        log.info("Nenhum valor diferente de zero — email nao enviado.")
+        return
+    ts = datetime.now(timezone.utc).astimezone().strftime("%d/%m/%Y %H:%M")
+    assunto = f"⚡ GNA Alert — Valores GTER/CMO/CMB detectados ({ts})"
+    linhas = "".join(f"""
+        <tr>
+          <td style="padding:6px 12px;border-bottom:1px solid #1e3a5f;color:{'#00c8ff' if a['planta']=='GNA I' else '#ffaa00'};font-weight:bold">{a['planta']}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #1e3a5f">{a['iper']}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #1e3a5f">{a['unidt']}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #1e3a5f;color:#ffaa00">{a['coluna']}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #1e3a5f;color:#00e57a;text-align:right">{a['valor']:,.2f}</td>
+        </tr>""" for a in alertas[:100])
+    corpo_html = f"""
+    <div style="background:#090d12;padding:24px;font-family:Arial,sans-serif;color:#c8dff5;max-width:800px">
+      <div style="background:#0d2040;border-left:4px solid #00c8ff;padding:14px 20px;margin-bottom:20px">
+        <h2 style="margin:0;color:#fff;font-size:18px">⚡ GNA MONITOR — ALERTA DESSEM</h2>
+        <p style="margin:4px 0 0;color:#6a8faf;font-size:12px;font-family:monospace">{ts} · pdo_oper_term.dat</p>
+      </div>
+      <p style="color:#6a8faf;font-size:13px">Detectados <strong style="color:#00e57a">{len(alertas)}</strong> valores diferentes de zero em GTER, ClinGter, CMO ou CMB.</p>
+      <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:13px;background:#0d1520;color:#c8dff5">
+        <thead><tr style="background:#111d2e">
+          <th style="padding:8px 12px;text-align:left;color:#6a8faf">Planta</th>
+          <th style="padding:8px 12px;text-align:left;color:#6a8faf">IPER</th>
+          <th style="padding:8px 12px;text-align:left;color:#6a8faf">UNIDT</th>
+          <th style="padding:8px 12px;text-align:left;color:#6a8faf">Coluna</th>
+          <th style="padding:8px 12px;text-align:right;color:#6a8faf">Valor</th>
+        </tr></thead>
+        <tbody>{linhas}</tbody>
+      </table>
+      <div style="margin-top:24px;padding-top:12px;border-top:1px solid #1e3a5f">
+        <a href="https://leandrosouza1234561.github.io/gna_dessem4/" style="color:#00c8ff;font-size:12px;font-family:monospace">→ Ver dashboard completo</a>
+      </div>
+    </div>"""
+    enviar_email(assunto, corpo_html)
+
 
 def fazer_login_keycloak(page):
     log.info(f"Login Keycloak. URL: {page.url}")
@@ -29,98 +116,73 @@ def fazer_login_keycloak(page):
         campo_pass.wait_for(timeout=10000)
         campo_pass.fill(ONS_PASS)
         time.sleep(1)
-        botao = page.locator("#kc-login, input[type='submit'], button[type='submit']").first
-        botao.click()
-        page.wait_for_function(
-            "() => !window.location.href.includes('sso.ons.org.br')",
-            timeout=60000
-        )
+        page.locator("#kc-login, input[type='submit'], button[type='submit']").first.click()
+        page.wait_for_function("() => !window.location.href.includes('sso.ons.org.br')", timeout=60000)
         log.info(f"Autenticado! URL: {page.url}")
         time.sleep(3)
         return True
     except Exception as e:
-        log.error(f"Erro login: {e}")
-        return False
+        log.error(f"Erro login: {e}"); return False
+
 
 def login_e_baixar(tmpdir):
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True,
             args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"])
         context = browser.new_context(
-            viewport={"width":1600,"height":900}, locale="pt-BR",
-            accept_downloads=True,
-            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
-        )
+            viewport={"width":1600,"height":900}, locale="pt-BR", accept_downloads=True,
+            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
         page = context.new_page()
         try:
             log.info("Acessando historico SINTEGRE...")
             page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
             time.sleep(4)
-            log.info(f"URL apos goto: {page.url}")
-
-            # Se redirecionou para SSO, faz login
             if "sso.ons.org.br" in page.url:
-                ok = fazer_login_keycloak(page)
-                if not ok: return None
+                if not fazer_login_keycloak(page): return None
                 time.sleep(3)
-
-            # Sempre navega de volta para o historico apos login
             if "historico-de-produtos" not in page.url:
-                log.info("Navegando para historico SINTEGRE...")
                 page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
                 time.sleep(5)
-                log.info(f"URL historico: {page.url}")
-
-            # Se ainda redirecionou para SSO (segunda tentativa)
             if "sso.ons.org.br" in page.url:
-                ok = fazer_login_keycloak(page)
-                if not ok: return None
+                if not fazer_login_keycloak(page): return None
                 page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
                 time.sleep(5)
-
-            try:
-                log.info(f"Pagina final: {page.title()} | {page.url}")
-            except Exception:
-                log.info(f"URL final: {page.url}")
-
+            try: log.info(f"Pagina: {page.title()} | {page.url}")
+            except: log.info(f"URL: {page.url}")
             botoes = page.locator("a:has-text('Baixar'), button:has-text('Baixar')").all()
             log.info(f"Botoes Baixar: {len(botoes)}")
             if not botoes:
-                log.error("Botao nao encontrado.")
-                log.info(f"HTML preview: {page.content()[:500]}")
-                return None
+                log.error("Botao nao encontrado."); return None
             with page.expect_download(timeout=120000) as dl:
                 botoes[0].click()
-            download = dl.value
             zip_path = Path(tmpdir) / "deck.zip"
-            download.save_as(zip_path)
+            dl.value.save_as(zip_path)
             log.info(f"ZIP: {zip_path.stat().st_size} bytes")
             return zip_path
         except Exception as e:
-            log.error(f"Erro: {e}", exc_info=True)
-            return None
+            log.error(f"Erro: {e}", exc_info=True); return None
         finally:
             browser.close()
 
-def extrair_arquivos(zip_path):
-    resultados = {}
+
+def extrair_dat(zip_path):
     try:
         with zipfile.ZipFile(zip_path) as zf:
-            arquivos_zip = zf.namelist()
-            log.info(f"ZIP: {len(arquivos_zip)} arquivos")
-            for nome_alvo in ARQUIVOS_DAT:
-                encontrado = next((n for n in arquivos_zip if nome_alvo.lower() in n.lower()), None)
-                if encontrado:
-                    conteudo = zf.read(encontrado).decode("latin-1", errors="replace")
-                    resultados[nome_alvo] = conteudo
-                    log.info(f"Extraido: {encontrado} ({len(conteudo)} chars)")
-                else:
-                    log.warning(f"Nao encontrado: {nome_alvo}")
+            arquivos = zf.namelist()
+            log.info(f"ZIP: {len(arquivos)} arquivos")
+            encontrado = next((n for n in arquivos if ARQUIVO_DAT.lower() in n.lower()), None)
+            if encontrado:
+                conteudo = zf.read(encontrado).decode("latin-1", errors="replace")
+                log.info(f"Extraido: {encontrado} ({len(conteudo)} chars)")
+                return conteudo
+            log.warning(f"Nao encontrado: {ARQUIVO_DAT}")
+            log.info(f"Arquivos no ZIP: {arquivos}")
     except Exception as e:
         log.error(f"Erro ZIP: {e}")
-    return resultados
+    return None
 
-def parsear_dat(conteudo, col_nome=2):
+
+def parsear_dat(conteudo):
     linhas = conteudo.splitlines()
     log.info(f"Total linhas: {len(linhas)}")
     cab_idx, cab_raw, colunas = None, "", []
@@ -128,14 +190,12 @@ def parsear_dat(conteudo, col_nome=2):
     for i, linha in enumerate(linhas):
         if linha.strip().startswith(("-","&","%","/")):
             continue
-        if re.search(r'IPER\s*:', linha, re.I):
-            continue
+        if re.search(r'[A-Z]+\s*:', linha) and ";" not in linha:
+            continue  # linha de descricao
         if re.search(r'\bIPER\b', linha, re.I) and ";" in linha:
             partes = [c.strip() for c in linha.split(";") if c.strip()]
             if len(partes) >= 3:
-                cab_idx = i
-                cab_raw = linha
-                colunas = partes
+                cab_idx, cab_raw, colunas = i, linha, partes
                 log.info(f"Cabecalho linha {i}: {colunas}")
                 break
 
@@ -144,29 +204,67 @@ def parsear_dat(conteudo, col_nome=2):
         return {"colunas":[],"registros":[],"raw_header":"",
                 "total_linhas_arquivo":len(linhas),"total_registros_gna":0}
 
+    # Indice das colunas chave
+    def idx_col(nome):
+        for j, c in enumerate(colunas):
+            if nome.lower() in c.lower():
+                return j
+        return -1
+
+    idx_usit     = idx_col("USIT")
+    idx_nome     = idx_col("Nome")
+    idx_numbarra = idx_col("NumBarra") if idx_col("NumBarra") >= 0 else idx_col("Barra")
+    log.info(f"idx_usit={idx_usit} idx_nome={idx_nome} idx_numbarra={idx_numbarra}")
+
     registros = []
     for linha in linhas[cab_idx+1:]:
         linha = linha.rstrip()
         if not linha or linha.strip().startswith(("-","&","%","/")):
             continue
         campos = [c.strip() for c in linha.split(";")]
-        if len(campos) <= col_nome:
+        if len(campos) < 4:
             continue
-        nome_usina = campos[col_nome].upper()
+
+        # Identifica planta pelo nome
+        nome_usina = campos[idx_nome].upper() if idx_nome >= 0 and idx_nome < len(campos) else ""
+        usit_val   = campos[idx_usit] if idx_usit >= 0 and idx_usit < len(campos) else ""
+        barra_val  = campos[idx_numbarra] if idx_numbarra >= 0 and idx_numbarra < len(campos) else ""
+
         planta_id = None
         if "GNA" in nome_usina:
             planta_id = "GNA II" if ("II" in nome_usina or " 2" in nome_usina) else "GNA I"
+
         if not planta_id:
             continue
+
+        # Aplica filtro de NumBarra
+        filtro = FILTRO_GNA.get(planta_id)
+        if filtro:
+            if usit_val != filtro["usit"] or barra_val != filtro["numbarra"]:
+                continue
+
+        # Monta registro apenas com colunas de exibicao
         reg = {"planta_id": planta_id}
         for j, col in enumerate(colunas):
-            reg[col] = _parse(campos[j]) if j < len(campos) else None
+            col_limpo = col.strip()
+            # Verifica se coluna esta na lista de exibicao (comparacao flexivel)
+            exibir = any(e.lower() in col_limpo.lower() or col_limpo.lower() in e.lower()
+                        for e in COLUNAS_EXIBIR)
+            if exibir and j < len(campos):
+                reg[col_limpo] = _parse(campos[j])
+
         registros.append(reg)
-        log.info(f"  -> {planta_id}: {reg}")
+        log.info(f"  -> {planta_id} | barra={barra_val}: {reg}")
 
     log.info(f"Total GNA: {len(registros)}")
-    return {"colunas":colunas,"registros":registros,"raw_header":cab_raw,
-            "total_linhas_arquivo":len(linhas),"total_registros_gna":len(registros)}
+    # Colunas para exibir (filtradas)
+    colunas_exibir = [c.strip() for c in colunas
+                      if any(e.lower() in c.lower() or c.lower() in e.lower()
+                             for e in COLUNAS_EXIBIR)]
+    return {"colunas": colunas_exibir, "registros": registros,
+            "raw_header": cab_raw, "total_linhas_arquivo": len(linhas),
+            "total_registros_gna": len(registros)}
+
 
 def _parse(t):
     if not t or t in ["-","N/A","*",""]: return None
@@ -175,60 +273,34 @@ def _parse(t):
     try: return float(t.replace(",","."))
     except: return t
 
-def salvar(dados_por_arquivo):
-    ts = datetime.now(timezone.utc).isoformat()
-    for nome, conteudo in dados_por_arquivo.items():
-        if conteudo:
-            (DOCS_DIR / nome).write_text(conteudo, encoding="utf-8", errors="replace")
 
+def salvar(conteudo_raw, dados):
+    ts = datetime.now(timezone.utc).isoformat()
+    if conteudo_raw:
+        (DOCS_DIR / ARQUIVO_DAT).write_text(conteudo_raw, encoding="utf-8", errors="replace")
     hist = []
     if JSON_FILE.exists():
         try: hist = json.loads(JSON_FILE.read_text()).get("historico", [])
         except: pass
-
-    dados_parseados = {}
-    for nome_arquivo, cfg in ARQUIVOS_DAT.items():
-        conteudo = dados_por_arquivo.get(nome_arquivo, "")
-        dados_parseados[nome_arquivo] = parsear_dat(conteudo, cfg["col_nome"]) if conteudo else {
-            "colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0}
-
-    principal = dados_parseados.get("pdo_oper_titulacao_usinas.dat", {})
-    pdo_term  = dados_parseados.get("pdo_term.dat", {})
-
-    snapshot = {
-        "timestamp": ts,
-        "colunas": principal.get("colunas", []),
-        "registros": principal.get("registros", []),
-        "total": principal.get("total_registros_gna", 0),
-        "pdo_term": {
-            "colunas": pdo_term.get("colunas", []),
-            "registros": pdo_term.get("registros", []),
-            "total": pdo_term.get("total_registros_gna", 0),
-        }
-    }
+    snapshot = {"timestamp": ts, "colunas": dados["colunas"],
+                "registros": dados["registros"], "total": dados["total_registros_gna"]}
     hist.append(snapshot)
-    hist = hist[-288:]
-
     saida = {
         "ultima_coleta": ts,
-        "status": "ok" if principal.get("registros") or pdo_term.get("registros") else "sem_dados",
-        "colunas": principal.get("colunas", []),
-        "raw_header": principal.get("raw_header", ""),
-        "total_linhas_arquivo": principal.get("total_linhas_arquivo", 0),
-        "registros": principal.get("registros", []),
-        "total_registros_gna": principal.get("total_registros_gna", 0),
-        "pdo_term": {
-            "colunas": pdo_term.get("colunas", []),
-            "raw_header": pdo_term.get("raw_header", ""),
-            "total_linhas_arquivo": pdo_term.get("total_linhas_arquivo", 0),
-            "registros": pdo_term.get("registros", []),
-            "total_registros_gna": pdo_term.get("total_registros_gna", 0),
-        },
-        "historico": hist,
+        "status": "ok" if dados["registros"] else "sem_dados",
+        "arquivo": ARQUIVO_DAT,
+        "colunas": dados["colunas"],
+        "raw_header": dados["raw_header"],
+        "total_linhas_arquivo": dados["total_linhas_arquivo"],
+        "registros": dados["registros"],
+        "total_registros_gna": dados["total_registros_gna"],
+        "historico": hist[-288:],
     }
     JSON_FILE.write_text(json.dumps(saida, ensure_ascii=False, indent=2), encoding="utf-8")
-    log.info(f"Salvo: {principal.get('total_registros_gna',0)} titulacao + {pdo_term.get('total_registros_gna',0)} term")
+    log.info(f"Salvo: {dados['total_registros_gna']} registros GNA")
+    verificar_e_alertar(dados["registros"])
     return saida
+
 
 def main():
     if not ONS_PASS:
@@ -236,14 +308,14 @@ def main():
     with tempfile.TemporaryDirectory() as tmpdir:
         zip_path = login_e_baixar(tmpdir)
         if not zip_path:
-            salvar({})
+            salvar("", {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0})
             return 1
-        dados_raw = extrair_arquivos(zip_path)
-        if not dados_raw:
-            log.error("Nenhum arquivo extraido.")
-            salvar({})
+        conteudo = extrair_dat(zip_path)
+        if not conteudo:
+            salvar("", {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0})
             return 1
-        salvar(dados_raw)
+        dados = parsear_dat(conteudo)
+        salvar(conteudo, dados)
         log.info("Concluido!")
         return 0
 
