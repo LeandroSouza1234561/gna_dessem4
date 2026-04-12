@@ -62,7 +62,10 @@ def login_e_baixar(tmpdir):
                 if "historico-de-produtos" not in page.url:
                     page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
                     time.sleep(4)
-            log.info(f"Pagina: {page.title()}")
+            try:
+                log.info(f"Pagina: {page.title()}")
+            except Exception:
+                log.info(f"Pagina URL: {page.url}")
             botoes = page.locator("a:has-text('Baixar'), button:has-text('Baixar')").all()
             log.info(f"Botoes Baixar: {len(botoes)}")
             if not botoes:
@@ -105,13 +108,10 @@ def parsear_dat(conteudo, col_nome=2):
     cab_idx, cab_raw, colunas = None, "", []
 
     for i, linha in enumerate(linhas):
-        # Pula separadores e comentarios
         if linha.strip().startswith(("-","&","%","/")):
             continue
-        # Pula linhas de descricao tipo "IPER: Indice do periodo."
         if re.search(r'IPER\s*:', linha, re.I):
             continue
-        # Cabecalho real: tem IPER + ; + pelo menos 3 campos
         if re.search(r'\bIPER\b', linha, re.I) and ";" in linha:
             partes = [c.strip() for c in linha.split(";") if c.strip()]
             if len(partes) >= 3:
@@ -159,11 +159,9 @@ def _parse(t):
 
 def salvar(dados_por_arquivo):
     ts = datetime.now(timezone.utc).isoformat()
-
     for nome, conteudo in dados_por_arquivo.items():
         if conteudo:
-            raw_path = DOCS_DIR / nome
-            raw_path.write_text(conteudo, encoding="utf-8", errors="replace")
+            (DOCS_DIR / nome).write_text(conteudo, encoding="utf-8", errors="replace")
 
     hist = []
     if JSON_FILE.exists():
@@ -173,11 +171,8 @@ def salvar(dados_por_arquivo):
     dados_parseados = {}
     for nome_arquivo, cfg in ARQUIVOS_DAT.items():
         conteudo = dados_por_arquivo.get(nome_arquivo, "")
-        if conteudo:
-            dados_parseados[nome_arquivo] = parsear_dat(conteudo, cfg["col_nome"])
-        else:
-            dados_parseados[nome_arquivo] = {"colunas":[],"registros":[],"raw_header":"",
-                                              "total_linhas_arquivo":0,"total_registros_gna":0}
+        dados_parseados[nome_arquivo] = parsear_dat(conteudo, cfg["col_nome"]) if conteudo else {
+            "colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0}
 
     principal = dados_parseados.get("pdo_oper_titulacao_usinas.dat", {})
     pdo_term  = dados_parseados.get("pdo_term.dat", {})
