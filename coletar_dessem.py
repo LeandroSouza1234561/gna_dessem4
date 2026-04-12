@@ -14,19 +14,16 @@ SMTP_HOST  = "smtp.office365.com"
 SMTP_PORT  = 587
 
 URL_HISTORICO = "https://sintegre.ons.org.br/sites/9/51//paginas/servicos/historico-de-produtos.aspx?produto=Decks%20de%20entrada%20e%20sa%C3%ADda%20-%20Modelo%20DESSEM"
+URL_PDPW      = "https://pdpw.ons.org.br/pdp/frmCnsObservacoes.aspx"
 
 ARQUIVO_DAT = "pdo_oper_term.dat"
 
-# Filtro: GNA I = USIT 137 + NumBarra 53, GNA II = USIT 238 + NumBarra 44327
 FILTRO_GNA = {
     "GNA I":  {"usit": "137", "numbarra": "53"},
     "GNA II": {"usit": "238", "numbarra": "44327"},
 }
 
-# Colunas a exibir no dashboard
 COLUNAS_EXIBIR = ["USIT", "Nome Usit", "NomeSist", "NumBarra", "GTER", "ClinGter", "CMO", "CMB"]
-
-# Colunas para alerta de email (valores != 0)
 COLUNAS_ALERTA = ["GTER", "ClinGter", "CMO", "CMB"]
 
 DOCS_DIR  = Path(__file__).parent / "docs"
@@ -61,46 +58,24 @@ def verificar_e_alertar(registros):
         for col in COLUNAS_ALERTA:
             val = reg.get(col)
             if val is not None and isinstance(val, (int, float)) and val != 0:
-                alertas.append({
-                    "planta": reg.get("planta_id",""),
-                    "iper":   reg.get("IPER",""),
-                    "unidt":  reg.get("UNIDT",""),
-                    "coluna": col,
-                    "valor":  val,
-                })
+                alertas.append({"planta": reg.get("planta_id",""), "iper": reg.get("IPER",""),
+                                 "coluna": col, "valor": val})
     if not alertas:
-        log.info("Nenhum valor diferente de zero — email nao enviado.")
+        log.info("Sem alertas.")
         return
     ts = datetime.now(timezone.utc).astimezone().strftime("%d/%m/%Y %H:%M")
-    assunto = f"⚡ GNA Alert — Valores GTER/CMO/CMB detectados ({ts})"
-    linhas = "".join(f"""
-        <tr>
-          <td style="padding:6px 12px;border-bottom:1px solid #1e3a5f;color:{'#00c8ff' if a['planta']=='GNA I' else '#ffaa00'};font-weight:bold">{a['planta']}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #1e3a5f">{a['iper']}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #1e3a5f">{a['unidt']}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #1e3a5f;color:#ffaa00">{a['coluna']}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #1e3a5f;color:#00e57a;text-align:right">{a['valor']:,.2f}</td>
-        </tr>""" for a in alertas[:100])
-    corpo_html = f"""
-    <div style="background:#090d12;padding:24px;font-family:Arial,sans-serif;color:#c8dff5;max-width:800px">
+    assunto = f"⚡ GNA Alert — Valores detectados ({ts})"
+    linhas = "".join(f"<tr><td style='padding:6px 12px;border-bottom:1px solid #1e3a5f;color:{'#00c8ff' if a['planta']=='GNA I' else '#ffaa00'}'>{a['planta']}</td><td style='padding:6px 12px;border-bottom:1px solid #1e3a5f'>{a['iper']}</td><td style='padding:6px 12px;border-bottom:1px solid #1e3a5f;color:#ffaa00'>{a['coluna']}</td><td style='padding:6px 12px;border-bottom:1px solid #1e3a5f;color:#00e57a;text-align:right'>{a['valor']:,.2f}</td></tr>" for a in alertas[:100])
+    corpo_html = f"""<div style="background:#090d12;padding:24px;font-family:Arial;color:#c8dff5;max-width:800px">
       <div style="background:#0d2040;border-left:4px solid #00c8ff;padding:14px 20px;margin-bottom:20px">
-        <h2 style="margin:0;color:#fff;font-size:18px">⚡ GNA MONITOR — ALERTA DESSEM</h2>
-        <p style="margin:4px 0 0;color:#6a8faf;font-size:12px;font-family:monospace">{ts} · pdo_oper_term.dat</p>
+        <h2 style="margin:0;color:#fff">⚡ GNA MONITOR — ALERTA DESSEM</h2>
+        <p style="margin:4px 0 0;color:#6a8faf;font-size:12px">{ts}</p>
       </div>
-      <p style="color:#6a8faf;font-size:13px">Detectados <strong style="color:#00e57a">{len(alertas)}</strong> valores diferentes de zero em GTER, ClinGter, CMO ou CMB.</p>
-      <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:13px;background:#0d1520;color:#c8dff5">
-        <thead><tr style="background:#111d2e">
-          <th style="padding:8px 12px;text-align:left;color:#6a8faf">Planta</th>
-          <th style="padding:8px 12px;text-align:left;color:#6a8faf">IPER</th>
-          <th style="padding:8px 12px;text-align:left;color:#6a8faf">UNIDT</th>
-          <th style="padding:8px 12px;text-align:left;color:#6a8faf">Coluna</th>
-          <th style="padding:8px 12px;text-align:right;color:#6a8faf">Valor</th>
-        </tr></thead>
+      <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:13px;background:#0d1520">
+        <thead><tr style="background:#111d2e"><th style="padding:8px 12px;text-align:left">Planta</th><th style="padding:8px 12px;text-align:left">IPER</th><th style="padding:8px 12px;text-align:left">Coluna</th><th style="padding:8px 12px;text-align:right">Valor</th></tr></thead>
         <tbody>{linhas}</tbody>
       </table>
-      <div style="margin-top:24px;padding-top:12px;border-top:1px solid #1e3a5f">
-        <a href="https://leandrosouza1234561.github.io/gna_dessem4/" style="color:#00c8ff;font-size:12px;font-family:monospace">→ Ver dashboard completo</a>
-      </div>
+      <div style="margin-top:20px"><a href="https://leandrosouza1234561.github.io/gna_dessem4/" style="color:#00c8ff">→ Ver dashboard</a></div>
     </div>"""
     enviar_email(assunto, corpo_html)
 
@@ -126,6 +101,7 @@ def fazer_login_keycloak(page):
 
 
 def login_e_baixar(tmpdir):
+    """Login no SINTEGRE e baixa o ZIP do DESSEM."""
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True,
             args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"])
@@ -138,45 +114,143 @@ def login_e_baixar(tmpdir):
             page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
             time.sleep(4)
             if "sso.ons.org.br" in page.url:
-                if not fazer_login_keycloak(page): return None
+                if not fazer_login_keycloak(page): return None, context
                 time.sleep(3)
             if "historico-de-produtos" not in page.url:
                 page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
                 time.sleep(5)
             if "sso.ons.org.br" in page.url:
-                if not fazer_login_keycloak(page): return None
+                if not fazer_login_keycloak(page): return None, context
                 page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
                 time.sleep(5)
-            try: log.info(f"Pagina: {page.title()} | {page.url}")
-            except: log.info(f"URL: {page.url}")
             botoes = page.locator("a:has-text('Baixar'), button:has-text('Baixar')").all()
             log.info(f"Botoes Baixar: {len(botoes)}")
             if not botoes:
-                log.error("Botao nao encontrado."); return None
+                log.error("Botao nao encontrado."); return None, context
             with page.expect_download(timeout=120000) as dl:
                 botoes[0].click()
             zip_path = Path(tmpdir) / "deck.zip"
             dl.value.save_as(zip_path)
             log.info(f"ZIP: {zip_path.stat().st_size} bytes")
-            return zip_path
+            return zip_path, context
         except Exception as e:
-            log.error(f"Erro: {e}", exc_info=True); return None
+            log.error(f"Erro: {e}", exc_info=True)
+            return None, context
         finally:
-            browser.close()
+            page.close()
+
+
+def coletar_pdpw(context):
+    """Acessa PDPW e extrai tabela de comentários DESSEM para GNA GERAÇÃO."""
+    page = context.new_page()
+    try:
+        log.info("Acessando PDPW...")
+        page.goto(URL_PDPW, wait_until="domcontentloaded", timeout=30000)
+        time.sleep(4)
+
+        # Login se necessário
+        if "sso.ons.org.br" in page.url or "login" in page.url.lower():
+            if not fazer_login_keycloak(page): return []
+            page.goto(URL_PDPW, wait_until="domcontentloaded", timeout=30000)
+            time.sleep(4)
+
+        log.info(f"PDPW URL: {page.url}")
+
+        # Seleciona empresa GNA GERAÇÃO
+        try:
+            select_empresa = page.locator("select").filter(has_text="").nth(1)
+            # Tenta pelo label Empresa
+            empresa_sel = page.locator("select[name*='mpresa'], select[id*='mpresa'], select[id*='Empresa']").first
+            empresa_sel.wait_for(timeout=10000)
+            empresa_sel.select_option(label="GNA GERAÇÃO")
+            log.info("Empresa GNA GERAÇÃO selecionada.")
+            time.sleep(3)
+        except Exception as e:
+            log.warning(f"Erro ao selecionar empresa: {e}")
+            # Tenta selecionar pelo valor
+            try:
+                selects = page.locator("select").all()
+                for sel in selects:
+                    options = sel.locator("option").all()
+                    for opt in options:
+                        if "GNA" in (opt.inner_text() or "").upper():
+                            sel.select_option(label=opt.inner_text().strip())
+                            log.info(f"Empresa selecionada: {opt.inner_text()}")
+                            time.sleep(3)
+                            break
+            except Exception as e2:
+                log.error(f"Erro select empresa fallback: {e2}")
+
+        # Aguarda tabela carregar
+        time.sleep(3)
+
+        # Extrai tabela com 48 meias horas
+        registros = []
+        tabelas = page.locator("table").all()
+        log.info(f"Tabelas encontradas: {len(tabelas)}")
+
+        for tabela in tabelas:
+            html = tabela.inner_html()
+            if "GGNA" in html or "Intervalo" in html or "00:00" in html:
+                log.info("Tabela PDPW encontrada!")
+                linhas = tabela.locator("tr").all()
+
+                # Extrai cabeçalho
+                cabecalho = []
+                for cell in linhas[0].locator("th, td").all():
+                    cabecalho.append(cell.inner_text().strip())
+                log.info(f"Cabecalho PDPW: {cabecalho}")
+
+                # Extrai subheader se existir
+                subheader = []
+                if len(linhas) > 1:
+                    for cell in linhas[1].locator("th, td").all():
+                        subheader.append(cell.inner_text().strip())
+
+                # Monta colunas combinadas
+                colunas_pdpw = []
+                for i, h in enumerate(cabecalho):
+                    if h and h not in ["", " "]:
+                        colunas_pdpw.append(h)
+                    elif i < len(subheader) and subheader[i]:
+                        colunas_pdpw.append(subheader[i])
+                    else:
+                        colunas_pdpw.append(f"col_{i}")
+
+                # Extrai dados
+                inicio = 2 if subheader else 1
+                for linha in linhas[inicio:]:
+                    celulas = [c.inner_text().strip() for c in linha.locator("td").all()]
+                    if not celulas or len(celulas) < 2:
+                        continue
+                    reg = {}
+                    for j, col in enumerate(colunas_pdpw):
+                        reg[col] = _parse(celulas[j]) if j < len(celulas) else None
+                    registros.append(reg)
+
+                log.info(f"PDPW: {len(registros)} registros extraidos")
+                return {"colunas": colunas_pdpw, "registros": registros}
+
+        log.warning("Tabela PDPW nao encontrada.")
+        return {"colunas": [], "registros": []}
+
+    except Exception as e:
+        log.error(f"Erro PDPW: {e}", exc_info=True)
+        return {"colunas": [], "registros": []}
+    finally:
+        page.close()
 
 
 def extrair_dat(zip_path):
     try:
         with zipfile.ZipFile(zip_path) as zf:
             arquivos = zf.namelist()
-            log.info(f"ZIP: {len(arquivos)} arquivos")
             encontrado = next((n for n in arquivos if ARQUIVO_DAT.lower() in n.lower()), None)
             if encontrado:
                 conteudo = zf.read(encontrado).decode("latin-1", errors="replace")
-                log.info(f"Extraido: {encontrado} ({len(conteudo)} chars)")
+                log.info(f"Extraido: {encontrado}")
                 return conteudo
-            log.warning(f"Nao encontrado: {ARQUIVO_DAT}")
-            log.info(f"Arquivos no ZIP: {arquivos}")
+            log.warning(f"Nao encontrado: {ARQUIVO_DAT}. Arquivos: {arquivos}")
     except Exception as e:
         log.error(f"Erro ZIP: {e}")
     return None
@@ -184,37 +258,29 @@ def extrair_dat(zip_path):
 
 def parsear_dat(conteudo):
     linhas = conteudo.splitlines()
-    log.info(f"Total linhas: {len(linhas)}")
     cab_idx, cab_raw, colunas = None, "", []
-
     for i, linha in enumerate(linhas):
         if linha.strip().startswith(("-","&","%","/")):
             continue
         if re.search(r'[A-Z]+\s*:', linha) and ";" not in linha:
-            continue  # linha de descricao
+            continue
         if re.search(r'\bIPER\b', linha, re.I) and ";" in linha:
             partes = [c.strip() for c in linha.split(";") if c.strip()]
             if len(partes) >= 3:
                 cab_idx, cab_raw, colunas = i, linha, partes
                 log.info(f"Cabecalho linha {i}: {colunas}")
                 break
-
     if cab_idx is None:
-        log.warning("Cabecalho nao encontrado!")
-        return {"colunas":[],"registros":[],"raw_header":"",
-                "total_linhas_arquivo":len(linhas),"total_registros_gna":0}
+        return {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":len(linhas),"total_registros_gna":0}
 
-    # Indice das colunas chave
     def idx_col(nome):
         for j, c in enumerate(colunas):
-            if nome.lower() in c.lower():
-                return j
+            if nome.lower() in c.lower(): return j
         return -1
 
     idx_usit     = idx_col("USIT")
     idx_nome     = idx_col("Nome")
     idx_numbarra = idx_col("NumBarra") if idx_col("NumBarra") >= 0 else idx_col("Barra")
-    log.info(f"idx_usit={idx_usit} idx_nome={idx_nome} idx_numbarra={idx_numbarra}")
 
     registros = []
     for linha in linhas[cab_idx+1:]:
@@ -222,48 +288,30 @@ def parsear_dat(conteudo):
         if not linha or linha.strip().startswith(("-","&","%","/")):
             continue
         campos = [c.strip() for c in linha.split(";")]
-        if len(campos) < 4:
-            continue
-
-        # Identifica planta pelo nome
+        if len(campos) < 4: continue
         nome_usina = campos[idx_nome].upper() if idx_nome >= 0 and idx_nome < len(campos) else ""
         usit_val   = campos[idx_usit] if idx_usit >= 0 and idx_usit < len(campos) else ""
         barra_val  = campos[idx_numbarra] if idx_numbarra >= 0 and idx_numbarra < len(campos) else ""
-
         planta_id = None
         if "GNA" in nome_usina:
             planta_id = "GNA II" if ("II" in nome_usina or " 2" in nome_usina) else "GNA I"
-
-        if not planta_id:
-            continue
-
-        # Aplica filtro de NumBarra
+        if not planta_id: continue
         filtro = FILTRO_GNA.get(planta_id)
-        if filtro:
-            if usit_val != filtro["usit"] or barra_val != filtro["numbarra"]:
-                continue
-
-        # Monta registro apenas com colunas de exibicao
+        if filtro and (usit_val != filtro["usit"] or barra_val != filtro["numbarra"]):
+            continue
         reg = {"planta_id": planta_id}
         for j, col in enumerate(colunas):
             col_limpo = col.strip()
-            # Verifica se coluna esta na lista de exibicao (comparacao flexivel)
-            exibir = any(e.lower() in col_limpo.lower() or col_limpo.lower() in e.lower()
-                        for e in COLUNAS_EXIBIR)
+            exibir = any(e.lower() in col_limpo.lower() or col_limpo.lower() in e.lower() for e in COLUNAS_EXIBIR)
             if exibir and j < len(campos):
                 reg[col_limpo] = _parse(campos[j])
-
         registros.append(reg)
         log.info(f"  -> {planta_id} | barra={barra_val}: {reg}")
 
+    colunas_exibir = [c.strip() for c in colunas if any(e.lower() in c.lower() or c.lower() in e.lower() for e in COLUNAS_EXIBIR)]
     log.info(f"Total GNA: {len(registros)}")
-    # Colunas para exibir (filtradas)
-    colunas_exibir = [c.strip() for c in colunas
-                      if any(e.lower() in c.lower() or c.lower() in e.lower()
-                             for e in COLUNAS_EXIBIR)]
-    return {"colunas": colunas_exibir, "registros": registros,
-            "raw_header": cab_raw, "total_linhas_arquivo": len(linhas),
-            "total_registros_gna": len(registros)}
+    return {"colunas": colunas_exibir, "registros": registros, "raw_header": cab_raw,
+            "total_linhas_arquivo": len(linhas), "total_registros_gna": len(registros)}
 
 
 def _parse(t):
@@ -274,7 +322,7 @@ def _parse(t):
     except: return t
 
 
-def salvar(conteudo_raw, dados):
+def salvar(conteudo_raw, dados_dat, dados_pdpw):
     ts = datetime.now(timezone.utc).isoformat()
     if conteudo_raw:
         (DOCS_DIR / ARQUIVO_DAT).write_text(conteudo_raw, encoding="utf-8", errors="replace")
@@ -282,23 +330,29 @@ def salvar(conteudo_raw, dados):
     if JSON_FILE.exists():
         try: hist = json.loads(JSON_FILE.read_text()).get("historico", [])
         except: pass
-    snapshot = {"timestamp": ts, "colunas": dados["colunas"],
-                "registros": dados["registros"], "total": dados["total_registros_gna"]}
+    snapshot = {
+        "timestamp": ts,
+        "colunas": dados_dat["colunas"],
+        "registros": dados_dat["registros"],
+        "total": dados_dat["total_registros_gna"],
+        "pdpw": dados_pdpw,
+    }
     hist.append(snapshot)
     saida = {
         "ultima_coleta": ts,
-        "status": "ok" if dados["registros"] else "sem_dados",
+        "status": "ok" if dados_dat["registros"] or dados_pdpw.get("registros") else "sem_dados",
         "arquivo": ARQUIVO_DAT,
-        "colunas": dados["colunas"],
-        "raw_header": dados["raw_header"],
-        "total_linhas_arquivo": dados["total_linhas_arquivo"],
-        "registros": dados["registros"],
-        "total_registros_gna": dados["total_registros_gna"],
+        "colunas": dados_dat["colunas"],
+        "raw_header": dados_dat["raw_header"],
+        "total_linhas_arquivo": dados_dat["total_linhas_arquivo"],
+        "registros": dados_dat["registros"],
+        "total_registros_gna": dados_dat["total_registros_gna"],
+        "pdpw": dados_pdpw,
         "historico": hist[-288:],
     }
     JSON_FILE.write_text(json.dumps(saida, ensure_ascii=False, indent=2), encoding="utf-8")
-    log.info(f"Salvo: {dados['total_registros_gna']} registros GNA")
-    verificar_e_alertar(dados["registros"])
+    log.info(f"Salvo: {dados_dat['total_registros_gna']} dat + {len(dados_pdpw.get('registros',[]))} pdpw")
+    verificar_e_alertar(dados_dat["registros"])
     return saida
 
 
@@ -306,16 +360,28 @@ def main():
     if not ONS_PASS:
         log.error("ONS_PASS nao definido!"); return 1
     with tempfile.TemporaryDirectory() as tmpdir:
-        zip_path = login_e_baixar(tmpdir)
-        if not zip_path:
-            salvar("", {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0})
-            return 1
-        conteudo = extrair_dat(zip_path)
-        if not conteudo:
-            salvar("", {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0})
-            return 1
-        dados = parsear_dat(conteudo)
-        salvar(conteudo, dados)
+        zip_path, context = login_e_baixar(tmpdir)
+
+        # Coleta PDPW usando a mesma sessão autenticada
+        dados_pdpw = {"colunas": [], "registros": []}
+        if context:
+            try:
+                dados_pdpw = coletar_pdpw(context)
+                log.info(f"PDPW: {len(dados_pdpw.get('registros',[]))} registros")
+            except Exception as e:
+                log.error(f"Erro PDPW: {e}")
+            finally:
+                try: context.browser.close()
+                except: pass
+
+        conteudo_dat = None
+        if zip_path:
+            conteudo_dat = extrair_dat(zip_path)
+
+        dados_dat = parsear_dat(conteudo_dat) if conteudo_dat else {
+            "colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0}
+
+        salvar(conteudo_dat or "", dados_dat, dados_pdpw)
         log.info("Concluido!")
         return 0
 
