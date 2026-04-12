@@ -1,1 +1,42 @@
+name: Coleta GNA
 
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Instalar Chromium
+        run: playwright install chromium --with-deps
+
+      - name: Rodar coleta
+        env:
+          ONS_USER: ${{ secrets.ONS_USER }}
+          ONS_PASS: ${{ secrets.ONS_PASS }}
+        run: python coletar_dessem.py
+
+      - name: Commit dados
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "gi
