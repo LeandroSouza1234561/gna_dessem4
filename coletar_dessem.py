@@ -7,7 +7,6 @@ ONS_USER = os.environ.get("ONS_USER", "")
 ONS_PASS = os.environ.get("ONS_PASS", "")
 URL_HISTORICO = "https://sintegre.ons.org.br/sites/9/51//paginas/servicos/historico-de-produtos.aspx?produto=Decks%20de%20entrada%20e%20sa%C3%ADda%20-%20Modelo%20DESSEM"
 ARQUIVO_DAT  = "pdo_oper_titulacao_usinas.dat"
-PLANTAS_ALVO = ["GNA I","GNA II","GNA 1","GNA 2","GNAI","GNAII","UTE GNA"]
 DOCS_DIR  = Path(__file__).parent / "docs"
 JSON_FILE = DOCS_DIR / "dados_gna.json"
 RAW_FILE  = DOCS_DIR / "pdo_oper_titulacao_usinas.dat"
@@ -26,82 +25,53 @@ def login_e_baixar(tmpdir):
         )
         page = context.new_page()
         try:
-            # Vai direto para o historico — o SSO vai interceptar e pedir login
             log.info("Acessando historico SINTEGRE...")
             page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
             time.sleep(3)
-            log.info(f"URL apos goto: {page.url}")
-
-            # Se redirecionou para SSO, faz login
+            log.info(f"URL: {page.url}")
             if "sso.ons.org.br" in page.url or "login" in page.url.lower():
-                log.info("Fazendo login SSO...")
-                # Usuario
+                log.info("Login SSO...")
                 for sel in ["input[name='username']","input[type='email']","#i0116"]:
                     try:
                         el = page.locator(sel).first
                         el.wait_for(timeout=8000)
-                        el.fill(ONS_USER)
-                        log.info(f"Usuario via {sel}")
-                        break
+                        el.fill(ONS_USER); break
                     except: continue
-                # Botao next se existir
                 for sel in ["#idSIButton9","button:has-text('Next')"]:
                     try: page.locator(sel).first.click(timeout=3000); time.sleep(1); break
                     except: continue
-                # Senha
                 for sel in ["input[name='password']","input[type='password']","#i0118"]:
                     try:
                         el = page.locator(sel).first
                         el.wait_for(timeout=10000)
-                        el.fill(ONS_PASS)
-                        log.info("Senha preenchida.")
-                        break
+                        el.fill(ONS_PASS); break
                     except: continue
-                # Submit
-                for sel in ["button[type='submit']","button:has-text('Entrar')","#idSIButton9","input[type='submit']"]:
-                    try: page.locator(sel).first.click(timeout=5000); log.info("Login clicado."); break
+                for sel in ["button[type='submit']","button:has-text('Entrar')","#idSIButton9"]:
+                    try: page.locator(sel).first.click(timeout=5000); break
                     except: continue
-                # Aguarda voltar para SINTEGRE
-                log.info("Aguardando autenticacao...")
                 try:
                     page.wait_for_url("**/sintegre.ons.org.br/**", timeout=60000)
-                    log.info("Autenticado no SINTEGRE!")
+                    log.info("Autenticado!")
                 except PWTimeout:
-                    log.warning(f"Timeout SSO. URL atual: {page.url}")
+                    log.warning(f"Timeout. URL: {page.url}")
                 time.sleep(3)
-
-            log.info(f"URL final: {page.url}")
-
-            # Navega para o historico se ainda nao estiver la
-            if "historico-de-produtos" not in page.url:
-                log.info("Navegando para historico...")
-                page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
-                time.sleep(4)
-
-            log.info(f"URL historico: {page.url}")
-            log.info(f"Titulo: {page.title()}")
-
-            # Clica no primeiro botao Baixar
-            log.info("Procurando botao Baixar...")
+                if "historico-de-produtos" not in page.url:
+                    page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
+                    time.sleep(4)
+            log.info(f"Pagina: {page.title()}")
             botoes = page.locator("a:has-text('Baixar'), button:has-text('Baixar')").all()
-            log.info(f"Botoes encontrados: {len(botoes)}")
-
+            log.info(f"Botoes Baixar: {len(botoes)}")
             if not botoes:
-                # Loga HTML para debug
-                html = page.content()
-                log.info(f"HTML preview: {html[:500]}")
+                log.error("Nenhum botao encontrado.")
+                log.info(f"HTML: {page.content()[:1000]}")
                 return None
-
             with page.expect_download(timeout=120000) as dl:
                 botoes[0].click()
-                log.info("Clicou em Baixar!")
-
             download = dl.value
             zip_path = Path(tmpdir) / "deck.zip"
             download.save_as(zip_path)
-            log.info(f"ZIP salvo: {zip_path.stat().st_size} bytes")
+            log.info(f"ZIP: {zip_path.stat().st_size} bytes")
             return zip_path
-
         except Exception as e:
             log.error(f"Erro: {e}", exc_info=True)
             return None
@@ -112,55 +82,63 @@ def extrair_dat(zip_path):
     try:
         with zipfile.ZipFile(zip_path) as zf:
             arquivos = zf.namelist()
-            log.info(f"ZIP conteudo: {arquivos}")
+            log.info(f"ZIP: {arquivos}")
             dat = next((n for n in arquivos if ARQUIVO_DAT.lower() in n.lower()), None)
             if not dat: dat = next((n for n in arquivos if "pdo_oper" in n.lower()), None)
             if not dat: dat = next((n for n in arquivos if n.lower().endswith(".dat")), None)
             if not dat: return None
-            log.info(f"Extraindo: {dat}")
             return zf.read(dat).decode("latin-1", errors="replace")
     except Exception as e:
         log.error(f"Erro ZIP: {e}"); return None
 
 def parsear_dat(conteudo):
     linhas = conteudo.splitlines()
+    log.info(f"Total linhas: {len(linhas)}")
+
+    # Detecta cabecalho pela linha com IPER e Nome Usit
     cab_idx, cab_raw, colunas = None, "", []
     for i, linha in enumerate(linhas):
-        if linha.strip().startswith(("&","%","/")):
-            continue
-        if re.search(r'\b(NOME|USINA|USINAMED|IUSI|NUM|CODNOME)\b', linha, re.I):
-            cab_idx, cab_raw, colunas = i, linha, linha.split()
+        if re.search(r'\bIPER\b', linha, re.I) and re.search(r'\bUsit\b|\bNome\b', linha, re.I):
+            cab_idx = i
+            cab_raw = linha
+            colunas = [c.strip() for c in linha.split(";") if c.strip()]
             log.info(f"Cabecalho linha {i}: {colunas}")
             break
-    if not colunas:
-        max_c = 0
-        for i, linha in enumerate(linhas[:80]):
-            if linha.strip().startswith(("&","%","/")):
-                continue
-            c = linha.split()
-            if len(c) > max_c:
-                max_c, cab_idx, cab_raw, colunas = len(c), i, linha, c
+
     registros = []
-    if cab_idx is not None:
-        for linha in linhas[cab_idx+1:]:
-            linha = linha.rstrip()
-            if not linha or linha.strip().startswith(("&","%","/")):
-                continue
-            campos = linha.split()
-            if not campos: continue
-            s = " ".join(campos).upper()
-            planta_id = None
-            for p in PLANTAS_ALVO:
-                if p.upper() in s:
-                    planta_id = "GNA II" if ("II" in p or "2" in p) else "GNA I"
-                    break
-            if not planta_id: continue
-            reg = {"planta_id": planta_id}
-            for j, col in enumerate(colunas):
-                reg[col] = _parse(campos[j]) if j < len(campos) else None
-            for j in range(len(colunas), len(campos)):
-                reg[f"col_{j}"] = _parse(campos[j])
-            registros.append(reg)
+    if cab_idx is None:
+        log.warning("Cabecalho nao encontrado!")
+        return {"colunas": [], "registros": [], "raw_header": "",
+                "total_linhas_arquivo": len(linhas), "total_registros_gna": 0}
+
+    for linha in linhas[cab_idx+1:]:
+        linha = linha.rstrip()
+        if not linha or linha.strip().startswith(("-","&","%","/")):
+            continue
+        campos = [c.strip() for c in linha.split(";")]
+        if len(campos) < 3:
+            continue
+
+        # Nome da usina e a 3a coluna (indice 2)
+        nome_usina = campos[2].upper() if len(campos) > 2 else ""
+
+        planta_id = None
+        if "GNA" in nome_usina:
+            if "II" in nome_usina or " 2" in nome_usina:
+                planta_id = "GNA II"
+            else:
+                planta_id = "GNA I"
+
+        if not planta_id:
+            continue
+
+        reg = {"planta_id": planta_id}
+        for j, col in enumerate(colunas):
+            reg[col] = _parse(campos[j]) if j < len(campos) else None
+        registros.append(reg)
+        log.info(f"  -> {planta_id}: {reg}")
+
+    log.info(f"Total GNA: {len(registros)}")
     return {"colunas": colunas, "registros": registros, "raw_header": cab_raw,
             "total_linhas_arquivo": len(linhas), "total_registros_gna": len(registros)}
 
