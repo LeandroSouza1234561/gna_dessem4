@@ -77,17 +77,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .tab-btn:hover{color:var(--text)}
 .tab-btn.active.tgraf{color:var(--accent);border-bottom-color:var(--accent)}
 .tab-btn.active.tger{color:var(--text);border-bottom-color:var(--text2)}
-.tab-btn.active.tterm{color:#cc88ff;border-bottom-color:#cc88ff}
 .panel{background:var(--bg2);border:1px solid var(--border);border-top:none;overflow:hidden;margin-bottom:16px}
 .panel-header{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--bg3);border-bottom:1px solid var(--border);flex-wrap:wrap}
 .panel-accent{width:4px;height:20px;border-radius:1px;flex-shrink:0}
 .panel-accent.ca{background:var(--accent);box-shadow:0 0 8px var(--accent)}
-.panel-accent.ct{background:#cc88ff;box-shadow:0 0 8px #cc88ff}
 .panel-title{font-family:var(--head);font-size:15px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#fff}
 .panel-info{font-family:var(--mono);font-size:11px;color:var(--text3)}
 .btn-refresh{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;background:rgba(0,200,255,.06);border:1px solid var(--border2);color:var(--text2);cursor:pointer;transition:all .2s;margin-left:auto}
 .btn-refresh:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,200,255,.12)}
-/* Graficos lado a lado */
 .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:20px}
 @media(max-width:900px){.charts-row{grid-template-columns:1fr}}
 .chart-box{background:var(--bg3);border:1px solid var(--border);padding:16px}
@@ -96,7 +93,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .chart-box-title{font-family:var(--head);font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase}
 .chart-box-info{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px}
 .chart-box canvas{max-height:320px}
-/* Tabela */
 .search-bar{padding:10px 18px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .search-input{background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 12px;outline:none;flex:1;max-width:280px}
 .search-input:focus{border-color:var(--accent)}
@@ -136,39 +132,19 @@ footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:w
 <div class="modal-overlay" id="modal-config">
   <div class="modal">
     <div class="modal-title">&#9881; Configuracoes</div>
-    <div class="modal-field">
-      <label class="modal-label">Token GitHub</label>
-      <input class="modal-input" type="password" id="cfg-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
-      <div class="modal-info">github.com > Settings > Developer settings > Personal access tokens > Classic > scope: workflow</div>
-    </div>
-    <div class="modal-field">
-      <label class="modal-label">Repositorio</label>
-      <input class="modal-input" type="text" id="cfg-repo" value="LeandroSouza1234561/gna_dessem4">
-    </div>
-    <div class="modal-field">
-      <label class="modal-label">Workflow (.yml)</label>
-      <input class="modal-input" type="text" id="cfg-workflow" value="coletar.yml">
-    </div>
-    <div class="modal-field">
-      <label class="modal-label">Email notificacoes</label>
-      <input class="modal-input" type="email" id="cfg-email" placeholder="leandro.souza@gna.com.br">
-      <div class="modal-info">Configurado via secret EMAIL_TO no GitHub Actions</div>
-    </div>
+    <div class="modal-field"><label class="modal-label">Token GitHub</label><input class="modal-input" type="password" id="cfg-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"><div class="modal-info">github.com > Settings > Developer settings > Personal access tokens > Classic > scope: workflow</div></div>
+    <div class="modal-field"><label class="modal-label">Repositorio</label><input class="modal-input" type="text" id="cfg-repo" value="LeandroSouza1234561/gna_dessem4"></div>
+    <div class="modal-field"><label class="modal-label">Workflow (.yml)</label><input class="modal-input" type="text" id="cfg-workflow" value="coletar.yml"></div>
+    <div class="modal-field"><label class="modal-label">Email notificacoes</label><input class="modal-input" type="email" id="cfg-email" placeholder="leandro.souza@gna.com.br"><div class="modal-info">Configurado via secret EMAIL_TO no GitHub Actions</div></div>
     <div class="modal-status" id="modal-status"></div>
-    <div class="modal-btns">
-      <button class="modal-btn modal-btn-save" onclick="salvarConfig()">&#10003; Salvar</button>
-      <button class="modal-btn modal-btn-cancel" onclick="fecharConfig()">&#10005; Fechar</button>
-    </div>
+    <div class="modal-btns"><button class="modal-btn modal-btn-save" onclick="salvarConfig()">&#10003; Salvar</button><button class="modal-btn modal-btn-cancel" onclick="fecharConfig()">&#10005; Fechar</button></div>
   </div>
 </div>
 <div class="wrap">
 <header>
   <div class="header-left">
     <div class="logo-box">GNA</div>
-    <div class="header-title">
-      <h1>GNA GERACAO - DESSEM/ONS</h1>
-      <p>pdo_oper_term.dat + PDO Term (PDPW) · SINTEGRE ONS</p>
-    </div>
+    <div class="header-title"><h1>GNA GERACAO - DESSEM/ONS</h1><p>pdo_oper_term.dat + PDO Term (PDPW) · SINTEGRE ONS</p></div>
   </div>
   <div class="header-right">
     <div class="header-btns">
@@ -204,10 +180,7 @@ footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:w
 <div class="tabs">
   <button class="tab-btn active tgraf" onclick="trocarTab('graf',this)">Graficos</button>
   <button class="tab-btn tger" onclick="trocarTab('ger',this)">Tabela Geral</button>
-  <button class="tab-btn tterm" onclick="trocarTab('term',this)">PDO Term</button>
 </div>
-
-<!-- ABA GRAFICOS -->
 <div class="panel" id="tab-graf">
   <div class="panel-header">
     <div class="panel-accent ca"></div>
@@ -217,25 +190,17 @@ footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:w
   </div>
   <div class="charts-row">
     <div class="chart-box">
-      <div class="chart-box-header">
-        <div class="chart-box-dot" style="background:var(--gna1);box-shadow:0 0 6px var(--gna1)"></div>
-        <span class="chart-box-title" style="color:var(--gna1)">GNA I</span>
-      </div>
+      <div class="chart-box-header"><div class="chart-box-dot" style="background:var(--gna1);box-shadow:0 0 6px var(--gna1)"></div><span class="chart-box-title" style="color:var(--gna1)">GNA I</span></div>
       <div class="chart-box-info" id="info-gna1-graf">-</div>
       <canvas id="chart-gna1" style="margin-top:12px"></canvas>
     </div>
     <div class="chart-box">
-      <div class="chart-box-header">
-        <div class="chart-box-dot" style="background:var(--gna2);box-shadow:0 0 6px var(--gna2)"></div>
-        <span class="chart-box-title" style="color:var(--gna2)">GNA II</span>
-      </div>
+      <div class="chart-box-header"><div class="chart-box-dot" style="background:var(--gna2);box-shadow:0 0 6px var(--gna2)"></div><span class="chart-box-title" style="color:var(--gna2)">GNA II</span></div>
       <div class="chart-box-info" id="info-gna2-graf">-</div>
       <canvas id="chart-gna2" style="margin-top:12px"></canvas>
     </div>
   </div>
 </div>
-
-<!-- ABA TABELA GERAL -->
 <div class="panel" id="tab-ger" style="display:none">
   <div class="panel-header">
     <div class="panel-accent ca"></div>
@@ -253,18 +218,6 @@ footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:w
     </div>
   </div>
   <div class="table-wrap"><table><thead id="thead-ger"><tr><th>-</th></tr></thead><tbody id="tbody-ger"></tbody></table></div>
-</div>
-
-<!-- ABA PDO TERM -->
-<div class="panel" id="tab-term" style="display:none">
-  <div class="panel-header">
-    <div class="panel-accent ct"></div>
-    <span class="panel-title">PDO Term - GNA GERACAO</span>
-    <div class="panel-info" id="info-term">0 REGISTROS</div>
-    <button class="btn-refresh" id="btn-term" onclick="forcarAtualizacao('term')">&#8634; Atualizar</button>
-  </div>
-  <div class="search-bar"><input class="search-input" type="text" placeholder="Filtrar..." id="search-term" oninput="filtrarTabela('term')"></div>
-  <div class="table-wrap"><table><thead id="thead-term"><tr><th>-</th></tr></thead><tbody id="tbody-term"></tbody></table></div>
 </div>
 <footer>
   <span>GNA MONITOR · PDO_OPER_TERM + PDO_TERM · SINTEGRE/ONS</span>
@@ -289,8 +242,7 @@ async function dispararColeta(){
   const btn=document.getElementById('btn-coletar');
   btn.innerHTML='<span class="spin">&#9654;</span> Coletando...';btn.style.opacity='0.6';btn.style.pointerEvents='none';
   try{
-    const resp=await fetch(`https://api.github.com/repos/${c.repo}/actions/workflows/${c.workflow}/dispatches`,
-      {method:'POST',headers:{'Authorization':'Bearer '+c.token,'Accept':'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({ref:'main'})});
+    const resp=await fetch(`https://api.github.com/repos/${c.repo}/actions/workflows/${c.workflow}/dispatches`,{method:'POST',headers:{'Authorization':'Bearer '+c.token,'Accept':'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({ref:'main'})});
     if(resp.status===204){btn.innerHTML='&#10003; Iniciado!';btn.style.borderColor='var(--green)';btn.style.color='var(--green)';setTimeout(()=>{btn.innerHTML='&#9654; Coletar Agora';btn.style.opacity='1';btn.style.pointerEvents='auto';btn.style.borderColor='var(--green)';btn.style.color='var(--green)';},4000);setTimeout(()=>forcarAtualizacao(),90000);}
     else throw new Error('Status '+resp.status);
   }catch(e){btn.innerHTML='&#10005; Erro: '+e.message;btn.style.borderColor='var(--red)';btn.style.color='var(--red)';setTimeout(()=>{btn.innerHTML='&#9654; Coletar Agora';btn.style.opacity='1';btn.style.pointerEvents='auto';btn.style.borderColor='var(--green)';btn.style.color='var(--green)';},3000);}
@@ -298,17 +250,13 @@ async function dispararColeta(){
 
 function acharColSugerido(lista,tipo){return lista.find(c=>{const n=c.toLowerCase().replace(/\s+/g,'');if(tipo==='ggna2')return n.includes('ggna2')&&n.includes('sugerido');if(tipo==='ggna1')return n.includes('ggna')&&!n.includes('ggna2')&&n.includes('sugerido');return false;})||null;}
 
-// Renderiza grafico multi-serie para uma planta
 function renderGrafico(canvasId,infoId,planta,registros){
   const regs=registros.filter(r=>r.planta_id===planta);
   const cor=planta==='GNA I'?'#00c8ff':'#ffaa00';
   const ctx=document.getElementById(canvasId);
   if(!ctx)return;
   if(charts[canvasId])charts[canvasId].destroy();
-  if(!regs.length){
-    document.getElementById(infoId).textContent='Sem dados';
-    return;
-  }
+  if(!regs.length){document.getElementById(infoId).textContent='Sem dados';return;}
   const labels=regs.map((_,i)=>`P${i+1}`);
   const series=[
     {label:'ClinGter',data:regs.map(r=>r['ClinGter']??null),color:cor,yAxis:'y'},
@@ -317,41 +265,19 @@ function renderGrafico(canvasId,infoId,planta,registros){
     {label:'GTER',data:regs.map(r=>r['GTER']??null),color:'#ff9900',yAxis:'y'},
   ];
   const avg=arr=>{const v=arr.filter(x=>x!=null);return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):'-';};
-  document.getElementById(infoId).textContent=
-    `${regs.length} reg | ClinGter: ${avg(series[0].data)} MW | CMO: ${avg(series[1].data)} | CMB: ${avg(series[2].data)} | GTER: ${avg(series[3].data)} MW`;
-
-  charts[canvasId]=new Chart(ctx,{
-    type:'line',
-    data:{
-      labels,
-      datasets:series.map(s=>({
-        label:s.label,data:s.data,
-        borderColor:s.color,backgroundColor:s.color+'18',
-        pointBackgroundColor:s.color,pointRadius:2,pointHoverRadius:4,
-        borderWidth:2,fill:false,tension:0.3,yAxisID:s.yAxis
-      }))
-    },
-    options:{
-      responsive:true,maintainAspectRatio:true,
-      interaction:{mode:'index',intersect:false},
-      plugins:{
-        legend:{display:true,position:'top',labels:{color:'#6a8faf',font:{size:11},boxWidth:12,padding:16}},
-        tooltip:{backgroundColor:'#0d1520',borderColor:'#1e3a5f',borderWidth:1,titleColor:'#c8dff5',bodyColor:'#c8dff5',
-          callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y?.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})??'-'}`}}
-      },
-      scales:{
-        x:{ticks:{color:'#3d5a78',font:{size:9},maxRotation:0,maxTicksLimit:12},grid:{color:'rgba(30,58,95,.3)'},border:{color:'#1e3a5f'}},
-        y:{type:'linear',position:'left',ticks:{color:'#6a8faf',font:{size:10},callback:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:0})},grid:{color:'rgba(30,58,95,.2)'},border:{color:'#1e3a5f'},title:{display:true,text:'MW',color:'#3d5a78',font:{size:10}}},
-        y1:{type:'linear',position:'right',ticks:{color:'#6a8faf',font:{size:10},callback:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:0})},grid:{drawOnChartArea:false},border:{color:'#1e3a5f'},title:{display:true,text:'R$/MWh',color:'#3d5a78',font:{size:10}}}
-      }
-    }
-  });
+  document.getElementById(infoId).textContent=`${regs.length} reg | ClinGter: ${avg(series[0].data)} MW | CMO: ${avg(series[1].data)} | CMB: ${avg(series[2].data)} | GTER: ${avg(series[3].data)} MW`;
+  charts[canvasId]=new Chart(ctx,{type:'line',data:{labels,datasets:series.map(s=>({label:s.label,data:s.data,borderColor:s.color,backgroundColor:s.color+'18',pointBackgroundColor:s.color,pointRadius:2,pointHoverRadius:4,borderWidth:2,fill:false,tension:0.3,yAxisID:s.yAxis}))},
+  options:{responsive:true,maintainAspectRatio:true,interaction:{mode:'index',intersect:false},
+  plugins:{legend:{display:true,position:'top',labels:{color:'#6a8faf',font:{size:11},boxWidth:12,padding:16}},tooltip:{backgroundColor:'#0d1520',borderColor:'#1e3a5f',borderWidth:1,titleColor:'#c8dff5',bodyColor:'#c8dff5',callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y?.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})??'-'}`}}},
+  scales:{x:{ticks:{color:'#3d5a78',font:{size:9},maxRotation:0,maxTicksLimit:12},grid:{color:'rgba(30,58,95,.3)'},border:{color:'#1e3a5f'}},
+  y:{type:'linear',position:'left',ticks:{color:'#6a8faf',font:{size:10},callback:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:0})},grid:{color:'rgba(30,58,95,.2)'},border:{color:'#1e3a5f'},title:{display:true,text:'MW',color:'#3d5a78',font:{size:10}}},
+  y1:{type:'linear',position:'right',ticks:{color:'#6a8faf',font:{size:10},callback:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:0})},grid:{drawOnChartArea:false},border:{color:'#1e3a5f'},title:{display:true,text:'R$/MWh',color:'#3d5a78',font:{size:10}}}}}});
 }
 
 function tick(){const t=new Date().toLocaleTimeString('pt-BR',{hour12:false});document.getElementById('clock').textContent=t;document.getElementById('clock2').textContent=t;if(proximaColeta){const agora=Date.now(),prox=new Date(proximaColeta).getTime(),total=5*60*1000,restante=Math.max(0,prox-agora);document.getElementById('countdown-fill').style.width=((restante/total)*100).toFixed(1)+'%';}}
 setInterval(tick,1000);tick();
 
-function trocarTab(id,btn){tabAtual=id;['graf','ger','term'].forEach(t=>{document.getElementById('tab-'+t).style.display=(t===id)?'block':'none';});document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+function trocarTab(id,btn){tabAtual=id;['graf','ger'].forEach(t=>{document.getElementById('tab-'+t).style.display=(t===id)?'block':'none';});document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
 function setPlantaFiltro(planta){plantaFiltro=planta;document.getElementById('pbtn-all').className='planta-btn'+(planta==='all'?' active-all':'');document.getElementById('pbtn-gna1').className='planta-btn'+(planta==='GNA I'?' active-gna1':'');document.getElementById('pbtn-gna2').className='planta-btn'+(planta==='GNA II'?' active-gna2':'');aplicarFiltros();}
 function aplicarFiltros(){const q=(document.getElementById('search-ger').value||'').toLowerCase();let s=registrosFiltrados;if(plantaFiltro!=='all')s=s.filter(r=>r.planta_id===plantaFiltro);if(q)s=s.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q)));renderTabelaGer(s,registrosTermFiltrados);document.getElementById('info-ger').textContent=s.length+' REGISTROS';}
 function setPeriod(tipo,btn){periodoAtual=tipo;document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');aplicarPeriodo();}
@@ -377,19 +303,14 @@ function aplicarPeriodo(){
   let cols=dadosGlobal.colunas||[],colsTerm=dadosGlobal.pdo_term?.colunas||[];
   if(snapshots.length>0){const u=snapshots[snapshots.length-1];registros=u.registros||[];cols=u.colunas||dadosGlobal.colunas||[];registrosTerm=u.pdo_term?.registros||[];colsTerm=u.pdo_term?.colunas||dadosGlobal.pdo_term?.colunas||[];}
   colunas=cols;colunasTerm=colsTerm;registrosFiltrados=registros;registrosTermFiltrados=registrosTerm;
-  const gna1=registros.filter(r=>r.planta_id==='GNA I'),gna2=registros.filter(r=>r.planta_id==='GNA II');
   document.getElementById('meta-total').textContent=registros.length;
-  document.getElementById('meta-gna1').textContent=gna1.length;
-  document.getElementById('meta-gna2').textContent=gna2.length;
+  document.getElementById('meta-gna1').textContent=registros.filter(r=>r.planta_id==='GNA I').length;
+  document.getElementById('meta-gna2').textContent=registros.filter(r=>r.planta_id==='GNA II').length;
   document.getElementById('meta-term').textContent=registrosTerm.length;
-  document.getElementById('info-graf').textContent=`GNA I: ${gna1.length} reg | GNA II: ${gna2.length} reg`;
-  // Graficos
+  document.getElementById('info-graf').textContent=`GNA I: ${registros.filter(r=>r.planta_id==='GNA I').length} reg | GNA II: ${registros.filter(r=>r.planta_id==='GNA II').length} reg`;
   renderGrafico('chart-gna1','info-gna1-graf','GNA I',registros);
   renderGrafico('chart-gna2','info-gna2-graf','GNA II',registros);
-  // Tabela
   aplicarFiltros();
-  renderTabela('term',colunasTerm,registrosTerm,true);
-  document.getElementById('info-term').textContent=registrosTerm.length+' REGISTROS';
 }
 
 async function fetchDados(silencioso=false){
@@ -442,16 +363,6 @@ function renderTabelaGer(registros,registrosTerm){
   }).join('');
 }
 
-function renderTabela(id,cols,registros,incluirPlanta=false){
-  const thead=document.getElementById('thead-'+id),tbody=document.getElementById('tbody-'+id);
-  if(!registros.length){thead.innerHTML='<tr><th style="text-align:left">-</th></tr>';tbody.innerHTML='<tr><td><div class="empty"><div class="icon">&#128235;</div>Nenhum registro.</div></td></tr>';return;}
-  const todasCols=new Set();registros.forEach(r=>Object.keys(r).forEach(k=>{if(k!=='planta_id')todasCols.add(k)}));
-  const colsFinal=cols.filter(c=>todasCols.has(c)).concat([...todasCols].filter(c=>!cols.includes(c)).sort());
-  const thPlanta=incluirPlanta?`<th style="text-align:left;cursor:pointer" onclick="sortBy('${id}','planta_id')">PLANTA</th>`:'';
-  thead.innerHTML='<tr>'+thPlanta+colsFinal.map((c,i)=>{const cls=sortState.col===c?(sortState.dir==='asc'?' class="sort-asc"':' class="sort-desc"'):'';return `<th${cls} onclick="sortBy('${id}','${c}')" ${i===0?'style="text-align:left"':''}>${c}</th>`;}).join('')+'</tr>';
-  tbody.innerHTML=registros.map(r=>{const tdPlanta=incluirPlanta?`<td class="${r.planta_id==='GNA I'?'plant-gna1':'plant-gna2'}">${r.planta_id||'-'}</td>`:'';return '<tr>'+tdPlanta+colsFinal.map((c,i)=>`<td ${i===0?'style="text-align:left"':''}>${fmtCell(r[c])}</td>`).join('')+'</tr>';}).join('');
-}
-
 function sortByGer(col){
   const q=(document.getElementById('search-ger').value||'').toLowerCase();let regs=registrosFiltrados;
   if(plantaFiltro!=='all')regs=regs.filter(r=>r.planta_id===plantaFiltro);if(q)regs=regs.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q)));
@@ -459,15 +370,6 @@ function sortByGer(col){
   const dir=sortState.dir==='asc'?1:-1;regs.sort((a,b)=>{const av=a[col],bv=b[col];if(av==null&&bv==null)return 0;if(av==null)return 1;if(bv==null)return -1;if(typeof av==='number'&&typeof bv==='number')return(av-bv)*dir;return String(av).localeCompare(String(bv))*dir;});
   renderTabelaGer(regs,registrosTermFiltrados);
 }
-
-function sortBy(id,col){
-  const regs=id==='term'?registrosTermFiltrados:registrosFiltrados;if(!regs.length)return;
-  if(sortState.col===col)sortState.dir=sortState.dir==='asc'?'desc':'asc';else{sortState.col=col;sortState.dir='asc';}
-  const dir=sortState.dir==='asc'?1:-1;regs.sort((a,b)=>{const av=a[col],bv=b[col];if(av==null&&bv==null)return 0;if(av==null)return 1;if(bv==null)return -1;if(typeof av==='number'&&typeof bv==='number')return(av-bv)*dir;return String(av).localeCompare(String(bv))*dir;});
-  renderTabela(id,id==='term'?colunasTerm:colunas,regs,id==='term');
-}
-
-function filtrarTabela(id){const q=(document.getElementById('search-'+id).value||'').toLowerCase();let s=id==='term'?registrosTermFiltrados:registrosFiltrados;if(q)s=s.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q)));renderTabela(id,id==='term'?colunasTerm:colunas,s,id==='term');}
 
 fetchDados();
 setInterval(()=>fetchDados(true),5*60*1000);
