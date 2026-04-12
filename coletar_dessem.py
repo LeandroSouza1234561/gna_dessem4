@@ -24,16 +24,13 @@ def fazer_login_keycloak(page):
         campo_user = page.locator("#username, input[name='username'], input[type='text']").first
         campo_user.wait_for(timeout=15000)
         campo_user.fill(ONS_USER)
-        log.info("Usuario preenchido.")
         time.sleep(1)
         campo_pass = page.locator("#password, input[name='password'], input[type='password']").first
         campo_pass.wait_for(timeout=10000)
         campo_pass.fill(ONS_PASS)
-        log.info("Senha preenchida.")
         time.sleep(1)
         botao = page.locator("#kc-login, input[type='submit'], button[type='submit']").first
         botao.click()
-        log.info("Login submetido.")
         page.wait_for_function(
             "() => !window.location.href.includes('sso.ons.org.br')",
             timeout=60000
@@ -59,7 +56,6 @@ def login_e_baixar(tmpdir):
             log.info("Acessando historico SINTEGRE...")
             page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
             time.sleep(4)
-            log.info(f"URL: {page.url}")
             if "sso.ons.org.br" in page.url:
                 ok = fazer_login_keycloak(page)
                 if not ok: return None
@@ -74,7 +70,6 @@ def login_e_baixar(tmpdir):
                 return None
             with page.expect_download(timeout=120000) as dl:
                 botoes[0].click()
-                log.info("Clicou Baixar!")
             download = dl.value
             zip_path = Path(tmpdir) / "deck.zip"
             download.save_as(zip_path)
@@ -87,12 +82,11 @@ def login_e_baixar(tmpdir):
             browser.close()
 
 def extrair_arquivos(zip_path):
-    """Extrai todos os arquivos .dat de interesse do ZIP."""
     resultados = {}
     try:
         with zipfile.ZipFile(zip_path) as zf:
             arquivos_zip = zf.namelist()
-            log.info(f"ZIP conteudo ({len(arquivos_zip)} arquivos)")
+            log.info(f"ZIP: {len(arquivos_zip)} arquivos")
             for nome_alvo in ARQUIVOS_DAT:
                 encontrado = next((n for n in arquivos_zip if nome_alvo.lower() in n.lower()), None)
                 if encontrado:
@@ -100,30 +94,37 @@ def extrair_arquivos(zip_path):
                     resultados[nome_alvo] = conteudo
                     log.info(f"Extraido: {encontrado} ({len(conteudo)} chars)")
                 else:
-                    log.warning(f"Nao encontrado no ZIP: {nome_alvo}")
+                    log.warning(f"Nao encontrado: {nome_alvo}")
     except Exception as e:
         log.error(f"Erro ZIP: {e}")
     return resultados
 
 def parsear_dat(conteudo, col_nome=2):
-    """Parseia arquivo .dat separado por ; filtrando GNA I e II."""
     linhas = conteudo.splitlines()
     log.info(f"Total linhas: {len(linhas)}")
     cab_idx, cab_raw, colunas = None, "", []
 
     for i, linha in enumerate(linhas):
+        # Pula separadores e comentarios
         if linha.strip().startswith(("-","&","%","/")):
             continue
-        if re.search(r'\bIPER\b', linha, re.I):
-            cab_idx = i
-            cab_raw = linha
-            colunas = [c.strip() for c in linha.split(";") if c.strip()]
-            log.info(f"Cabecalho linha {i}: {colunas}")
-            break
+        # Pula linhas de descricao tipo "IPER: Indice do periodo."
+        if re.search(r'IPER\s*:', linha, re.I):
+            continue
+        # Cabecalho real: tem IPER + ; + pelo menos 3 campos
+        if re.search(r'\bIPER\b', linha, re.I) and ";" in linha:
+            partes = [c.strip() for c in linha.split(";") if c.strip()]
+            if len(partes) >= 3:
+                cab_idx = i
+                cab_raw = linha
+                colunas = partes
+                log.info(f"Cabecalho linha {i}: {colunas}")
+                break
 
     if cab_idx is None:
         log.warning("Cabecalho nao encontrado!")
-        return {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":len(linhas),"total_registros_gna":0}
+        return {"colunas":[],"registros":[],"raw_header":"",
+                "total_linhas_arquivo":len(linhas),"total_registros_gna":0}
 
     registros = []
     for linha in linhas[cab_idx+1:]:
@@ -143,6 +144,7 @@ def parsear_dat(conteudo, col_nome=2):
         for j, col in enumerate(colunas):
             reg[col] = _parse(campos[j]) if j < len(campos) else None
         registros.append(reg)
+        log.info(f"  -> {planta_id}: {reg}")
 
     log.info(f"Total GNA: {len(registros)}")
     return {"colunas":colunas,"registros":registros,"raw_header":cab_raw,
@@ -158,29 +160,25 @@ def _parse(t):
 def salvar(dados_por_arquivo):
     ts = datetime.now(timezone.utc).isoformat()
 
-    # Salva arquivos raw
     for nome, conteudo in dados_por_arquivo.items():
         if conteudo:
             raw_path = DOCS_DIR / nome
             raw_path.write_text(conteudo, encoding="utf-8", errors="replace")
-            log.info(f"Raw salvo: {raw_path}")
 
-    # Carrega historico
     hist = []
     if JSON_FILE.exists():
         try: hist = json.loads(JSON_FILE.read_text()).get("historico", [])
         except: pass
 
-    # Monta dados parseados
     dados_parseados = {}
     for nome_arquivo, cfg in ARQUIVOS_DAT.items():
         conteudo = dados_por_arquivo.get(nome_arquivo, "")
         if conteudo:
             dados_parseados[nome_arquivo] = parsear_dat(conteudo, cfg["col_nome"])
         else:
-            dados_parseados[nome_arquivo] = {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0}
+            dados_parseados[nome_arquivo] = {"colunas":[],"registros":[],"raw_header":"",
+                                              "total_linhas_arquivo":0,"total_registros_gna":0}
 
-    # Dados principais (pdo_oper_titulacao_usinas.dat)
     principal = dados_parseados.get("pdo_oper_titulacao_usinas.dat", {})
     pdo_term  = dados_parseados.get("pdo_term.dat", {})
 
@@ -216,7 +214,7 @@ def salvar(dados_por_arquivo):
         "historico": hist,
     }
     JSON_FILE.write_text(json.dumps(saida, ensure_ascii=False, indent=2), encoding="utf-8")
-    log.info(f"Salvo: {principal.get('total_registros_gna',0)} reg titulacao + {pdo_term.get('total_registros_gna',0)} reg term")
+    log.info(f"Salvo: {principal.get('total_registros_gna',0)} titulacao + {pdo_term.get('total_registros_gna',0)} term")
     return saida
 
 def main():
