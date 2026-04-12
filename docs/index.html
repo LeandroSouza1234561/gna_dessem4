@@ -19,8 +19,10 @@
 html,body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;min-height:100vh;overflow-x:hidden}
 .wrap{position:relative;z-index:1;max-width:1800px;margin:0 auto;padding:16px 20px}
 header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;background:var(--bg2);border:1px solid var(--border);border-left:5px solid var(--accent);margin-bottom:16px;flex-wrap:wrap;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
-.header-left{display:flex;align-items:center;gap:16px}
-.logo-box{width:52px;height:52px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:var(--head);font-weight:900;font-size:18px;color:#fff;letter-spacing:-1px;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);flex-shrink:0}
+.header-left{display:flex;align-items:center;gap:20px}
+.logo-wrap{height:52px;display:flex;align-items:center}
+.logo-wrap img{height:48px;width:auto;object-fit:contain;display:block}
+.header-divider{width:1px;height:40px;background:var(--border);flex-shrink:0}
 .header-title h1{font-family:var(--head);font-weight:900;font-size:22px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;line-height:1}
 .header-title p{font-family:var(--mono);font-size:11px;color:var(--text3);letter-spacing:1px;margin-top:4px}
 .header-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
@@ -72,12 +74,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .tab-btn.active.tger{color:var(--accent);border-bottom-color:var(--accent)}
 .panel{background:var(--bg2);border:1px solid var(--border);border-top:none;overflow:hidden;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
 .panel-header{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--bg3);border-bottom:1px solid var(--border);flex-wrap:wrap}
-.panel-accent{width:4px;height:20px;border-radius:2px;flex-shrink:0}
-.panel-accent.ca{background:var(--accent)}
+.panel-accent{width:4px;height:20px;border-radius:2px;flex-shrink:0;background:var(--accent)}
 .panel-title{font-family:var(--head);font-size:15px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent)}
 .panel-info{font-family:var(--mono);font-size:11px;color:var(--text3)}
 .btn-refresh{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;background:transparent;border:1px solid var(--border2);color:var(--text2);cursor:pointer;transition:all .2s;margin-left:auto;border-radius:2px}
-.btn-refresh:hover{border-color:var(--accent);color:var(--accent);background:rgba(45,58,74,.05)}
+.btn-refresh:hover{border-color:var(--accent);color:var(--accent)}
 .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:20px;background:var(--bg)}
 @media(max-width:900px){.charts-row{grid-template-columns:1fr}}
 .chart-box{background:var(--bg2);border:1px solid var(--border);padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
@@ -115,13 +116,13 @@ tbody td:first-child{text-align:left}
 .empty .icon{font-size:36px;margin-bottom:14px;opacity:.3}
 footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:12px 0;margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--text3);border-top:1px solid var(--border)}
 .footer-badge{background:var(--bg2);border:1px solid var(--border);padding:3px 10px;color:var(--text2)}
-#loading{position:fixed;inset:0;background:rgba(240,242,245,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;font-family:var(--mono);color:var(--text2);gap:16px}
+#loading{position:fixed;inset:0;background:rgba(240,242,245,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px}
 .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
 #loading.hidden{display:none}
 </style>
 </head>
 <body>
-<div id="loading"><div class="spinner"></div><span style="color:var(--text2);font-size:13px;letter-spacing:1px">CARREGANDO DADOS GNA...</span></div>
+<div id="loading"><div class="spinner"></div><span style="color:var(--text2);font-family:var(--mono);font-size:13px;letter-spacing:1px">CARREGANDO DADOS GNA...</span></div>
 <div class="modal-overlay" id="modal-config">
   <div class="modal">
     <div class="modal-title">&#9881; Configuracoes</div>
@@ -136,7 +137,11 @@ footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:w
 <div class="wrap">
 <header>
   <div class="header-left">
-    <div class="logo-box">GNA</div>
+    <div class="logo-wrap">
+      <img src="https://www.gna.com.br/portals/0/assets/img-new/logo-gna.svg" alt="GNA - Gas Natural Acu" onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='flex'">
+      <div id="logo-fallback" style="display:none;width:52px;height:52px;background:linear-gradient(135deg,#2d3a4a,#3d5a78);align-items:center;justify-content:center;font-family:var(--head);font-weight:900;font-size:18px;color:#fff;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%)">GNA</div>
+    </div>
+    <div class="header-divider"></div>
     <div class="header-title">
       <h1>GNA GERACAO - DESSEM/ONS</h1>
       <p>pdo_oper_term.dat + PDO Term (PDPW) · SINTEGRE ONS</p>
@@ -160,7 +165,7 @@ footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:w
 </div>
 <div class="panel" id="tab-graf">
   <div class="panel-header">
-    <div class="panel-accent ca"></div>
+    <div class="panel-accent"></div>
     <span class="panel-title">GNA GERACAO - Graficos</span>
     <div class="panel-info" id="info-graf">-</div>
     <button class="btn-refresh" onclick="forcarAtualizacao()">&#8634; Atualizar</button>
@@ -186,7 +191,7 @@ footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:w
 </div>
 <div class="panel" id="tab-ger" style="display:none">
   <div class="panel-header">
-    <div class="panel-accent ca"></div>
+    <div class="panel-accent"></div>
     <span class="panel-title">GNA GERACAO - Tabela</span>
     <div class="panel-info" id="info-ger">0 REGISTROS</div>
     <button class="btn-refresh" id="btn-ger" onclick="forcarAtualizacao('ger')">&#8634; Atualizar</button>
@@ -242,22 +247,26 @@ function renderGrafico(canvasId,infoId,planta,registros){
   if(!regs.length){document.getElementById(infoId).textContent='Sem dados';return;}
   const labels=regs.map((_,i)=>`P${i+1}`);
   const series=[
-    {label:'ClinGter',data:regs.map(r=>r['ClinGter']??null),color:corBase,yAxis:'y'},
-    {label:'CMO',data:regs.map(r=>r['CMO']??null),color:'#8b5cf6',yAxis:'y1'},
-    {label:'CMB',data:regs.map(r=>r['CMB']??null),color:'#059669',yAxis:'y1'},
-    {label:'GTER',data:regs.map(r=>r['GTER']??null),color:'#0891b2',yAxis:'y'},
+    {label:'CVU',  data:regs.map(r=>r['ClinGter']??null), color:corBase,   yAxis:'y'},
+    {label:'CMO',  data:regs.map(r=>r['CMO']??null),      color:'#8b5cf6', yAxis:'y1'},
+    {label:'CMB',  data:regs.map(r=>r['CMB']??null),      color:'#059669', yAxis:'y1'},
+    {label:'Desp', data:regs.map(r=>r['GTER']??null),     color:'#0891b2', yAxis:'y'},
   ];
   const avg=arr=>{const v=arr.filter(x=>x!=null);return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):'-';};
-  document.getElementById(infoId).textContent=`${regs.length} registros | ClinGter: ${avg(series[0].data)} MW | CMO: ${avg(series[1].data)} | CMB: ${avg(series[2].data)} | GTER: ${avg(series[3].data)} MW`;
-  charts[canvasId]=new Chart(ctx,{type:'line',data:{labels,datasets:series.map(s=>({label:s.label,data:s.data,borderColor:s.color,backgroundColor:s.color+'15',pointBackgroundColor:s.color,pointRadius:2,pointHoverRadius:5,borderWidth:2,fill:false,tension:0.3,yAxisID:s.yAxis}))},
-  options:{responsive:true,maintainAspectRatio:true,interaction:{mode:'index',intersect:false},
-  plugins:{legend:{display:true,position:'top',labels:{color:'#4a5568',font:{size:11,family:'Barlow'},boxWidth:14,padding:18}},
-  tooltip:{backgroundColor:'#fff',borderColor:'#dde1e7',borderWidth:1,titleColor:'#1a2333',bodyColor:'#4a5568',boxShadow:'0 4px 12px rgba(0,0,0,.1)',callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y?.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})??'-'}`}}},
-  scales:{
-    x:{ticks:{color:'#8a94a6',font:{size:9},maxRotation:0,maxTicksLimit:12},grid:{color:'rgba(0,0,0,.04)'},border:{color:'#dde1e7'}},
-    y:{type:'linear',position:'left',ticks:{color:'#4a5568',font:{size:10},callback:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:0})},grid:{color:'rgba(0,0,0,.04)'},border:{color:'#dde1e7'},title:{display:true,text:'MW',color:'#8a94a6',font:{size:10}}},
-    y1:{type:'linear',position:'right',ticks:{color:'#4a5568',font:{size:10},callback:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:0})},grid:{drawOnChartArea:false},border:{color:'#dde1e7'},title:{display:true,text:'R$/MWh',color:'#8a94a6',font:{size:10}}}
-  }}});
+  document.getElementById(infoId).textContent=`${regs.length} registros | CVU: ${avg(series[0].data)} MW | CMO: ${avg(series[1].data)} | CMB: ${avg(series[2].data)} | Desp: ${avg(series[3].data)} MW`;
+  charts[canvasId]=new Chart(ctx,{type:'line',
+    data:{labels,datasets:series.map(s=>({label:s.label,data:s.data,borderColor:s.color,backgroundColor:s.color+'15',pointBackgroundColor:s.color,pointRadius:2,pointHoverRadius:5,borderWidth:2,fill:false,tension:0.3,yAxisID:s.yAxis}))},
+    options:{responsive:true,maintainAspectRatio:true,interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{display:true,position:'top',labels:{color:'#4a5568',font:{size:11,family:'Barlow'},boxWidth:14,padding:18}},
+      tooltip:{backgroundColor:'#fff',borderColor:'#dde1e7',borderWidth:1,titleColor:'#1a2333',bodyColor:'#4a5568',callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y?.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})??'-'}`}}
+    },
+    scales:{
+      x:{ticks:{color:'#8a94a6',font:{size:9},maxRotation:0,maxTicksLimit:12},grid:{color:'rgba(0,0,0,.04)'},border:{color:'#dde1e7'}},
+      y:{type:'linear',position:'left',ticks:{color:'#4a5568',font:{size:10},callback:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:0})},grid:{color:'rgba(0,0,0,.04)'},border:{color:'#dde1e7'},title:{display:true,text:'MW',color:'#8a94a6',font:{size:10}}},
+      y1:{type:'linear',position:'right',ticks:{color:'#4a5568',font:{size:10},callback:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:0})},grid:{drawOnChartArea:false},border:{color:'#dde1e7'},title:{display:true,text:'R$/MWh',color:'#8a94a6',font:{size:10}}}
+    }}
+  });
 }
 
 function tick(){const t=new Date().toLocaleTimeString('pt-BR',{hour12:false});document.getElementById('clock').textContent=t;document.getElementById('clock2').textContent=t;if(proximaColeta){const agora=Date.now(),prox=new Date(proximaColeta).getTime(),total=5*60*1000,restante=Math.max(0,prox-agora);document.getElementById('countdown-fill').style.width=((restante/total)*100).toFixed(1)+'%';}}
