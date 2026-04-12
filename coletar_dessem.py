@@ -55,7 +55,7 @@ def enviar_relatorio_diario(dados_dat, dados_pdpw):
     if not EMAIL_PASS:
         log.warning("EMAIL_PASS nao configurado - email nao enviado.")
         return
-    ts = datetime.now(timezone.utc).astimezone().strftime("%d/%m/%Y %H:%M")
+    ts   = datetime.now(timezone.utc).astimezone().strftime("%d/%m/%Y %H:%M")
     hoje = datetime.now().strftime("%d/%m/%Y")
     registros_dat  = dados_dat.get("registros", [])
     registros_pdpw = dados_pdpw.get("registros", [])
@@ -66,20 +66,20 @@ def enviar_relatorio_diario(dados_dat, dados_pdpw):
     linhas_dat = ""
     for reg in registros_dat:
         planta = reg.get("planta_id", "")
-        cor = "#00c8ff" if planta == "GNA I" else "#ffaa00"
-        cells = f"<td style='padding:6px 10px;border-bottom:1px solid #1e3a5f;color:{cor};font-weight:bold'>{planta}</td>"
+        cor = "#3d4d5c" if planta == "GNA I" else "#e8650a"
+        cells = f"<td style='padding:6px 10px;border-bottom:1px solid #dde1e7;color:{cor};font-weight:bold'>{planta}</td>"
         for col in colunas_dat:
             val = reg.get(col, "")
             if isinstance(val, float):
                 val_fmt = f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             else:
                 val_fmt = str(val) if val is not None else "-"
-            cells += f"<td style='padding:6px 10px;border-bottom:1px solid #1e3a5f;text-align:right'>{val_fmt}</td>"
+            cells += f"<td style='padding:6px 10px;border-bottom:1px solid #dde1e7;text-align:right'>{val_fmt}</td>"
         linhas_dat += f"<tr>{cells}</tr>"
 
-    header_dat = "<th style='padding:7px 10px;background:#111d2e;text-align:left'>PLANTA</th>"
+    header_dat = "<th style='padding:7px 10px;background:#f7f8fa;text-align:left;color:#4a5568'>PLANTA</th>"
     for col in colunas_dat:
-        header_dat += f"<th style='padding:7px 10px;background:#111d2e;text-align:right'>{col}</th>"
+        header_dat += f"<th style='padding:7px 10px;background:#f7f8fa;text-align:right;color:#4a5568'>{col}</th>"
 
     colunas_pdpw = dados_pdpw.get("colunas", [])
     excluir = ["data_pdpw", "empresa", "data", "intervalo"]
@@ -94,53 +94,53 @@ def enviar_relatorio_diario(dados_dat, dados_pdpw):
                 val_fmt = f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             else:
                 val_fmt = str(val) if val is not None else "-"
-            cells += f"<td style='padding:5px 10px;border-bottom:1px solid #1e3a5f;text-align:right;font-size:11px'>{val_fmt}</td>"
+            cells += f"<td style='padding:5px 10px;border-bottom:1px solid #dde1e7;text-align:right;font-size:11px'>{val_fmt}</td>"
         linhas_pdpw += f"<tr>{cells}</tr>"
 
     header_pdpw = ""
     for col in colunas_pdpw_exib:
-        header_pdpw += f"<th style='padding:6px 10px;background:#111d2e;text-align:right;font-size:10px'>{col}</th>"
+        header_pdpw += f"<th style='padding:6px 10px;background:#f7f8fa;text-align:right;font-size:10px;color:#4a5568'>{col}</th>"
 
     corpo_html = f"""
-<div style="background:#090d12;padding:24px;font-family:Arial,sans-serif;color:#c8dff5;max-width:1000px">
-  <div style="background:linear-gradient(135deg,#0a1825,#0d2040);border-left:4px solid #00c8ff;padding:16px 20px;margin-bottom:20px">
-    <div style="font-weight:900;font-size:20px;color:#fff;letter-spacing:2px;text-transform:uppercase">GNA GERACAO - RELATORIO DESSEM</div>
-    <div style="font-size:11px;color:#6a8faf;margin-top:4px;font-family:monospace">Coleta: {ts} | Data PDPW: {data_pdpw} | Empresa: {empresa_pdpw}</div>
+<div style="background:#f0f2f5;padding:24px;font-family:Arial,sans-serif;color:#1a2333;max-width:1000px">
+  <div style="background:#fff;border-left:5px solid #2d3a4a;padding:16px 20px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+    <div style="font-weight:900;font-size:20px;color:#2d3a4a;letter-spacing:2px;text-transform:uppercase">GNA GERACAO - RELATORIO DESSEM</div>
+    <div style="font-size:11px;color:#8a94a6;margin-top:4px;font-family:monospace">Coleta: {ts} | Data PDPW: {data_pdpw} | Empresa: {empresa_pdpw}</div>
   </div>
   <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
-    <div style="background:#0d1520;border:1px solid #1e3a5f;padding:12px 18px;flex:1;min-width:140px">
-      <div style="font-size:10px;color:#3d5a78;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">Registros DAT</div>
-      <div style="font-size:20px;color:#00c8ff;font-family:monospace;font-weight:bold">{len(registros_dat)}</div>
+    <div style="background:#fff;border:1px solid #dde1e7;padding:12px 18px;flex:1;min-width:140px">
+      <div style="font-size:10px;color:#8a94a6;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">Registros DAT</div>
+      <div style="font-size:20px;color:#2d3a4a;font-family:monospace;font-weight:bold">{len(registros_dat)}</div>
     </div>
-    <div style="background:#0d1520;border:1px solid #1e3a5f;padding:12px 18px;flex:1;min-width:140px">
-      <div style="font-size:10px;color:#3d5a78;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">GNA I</div>
-      <div style="font-size:20px;color:#00c8ff;font-family:monospace;font-weight:bold">{sum(1 for r in registros_dat if r.get('planta_id')=='GNA I')}</div>
+    <div style="background:#fff;border:1px solid #dde1e7;padding:12px 18px;flex:1;min-width:140px">
+      <div style="font-size:10px;color:#8a94a6;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">GNA I</div>
+      <div style="font-size:20px;color:#3d4d5c;font-family:monospace;font-weight:bold">{sum(1 for r in registros_dat if r.get('planta_id')=='GNA I')}</div>
     </div>
-    <div style="background:#0d1520;border:1px solid #1e3a5f;padding:12px 18px;flex:1;min-width:140px">
-      <div style="font-size:10px;color:#3d5a78;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">GNA II</div>
-      <div style="font-size:20px;color:#ffaa00;font-family:monospace;font-weight:bold">{sum(1 for r in registros_dat if r.get('planta_id')=='GNA II')}</div>
+    <div style="background:#fff;border:1px solid #dde1e7;padding:12px 18px;flex:1;min-width:140px">
+      <div style="font-size:10px;color:#8a94a6;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">GNA II</div>
+      <div style="font-size:20px;color:#e8650a;font-family:monospace;font-weight:bold">{sum(1 for r in registros_dat if r.get('planta_id')=='GNA II')}</div>
     </div>
-    <div style="background:#0d1520;border:1px solid #1e3a5f;padding:12px 18px;flex:1;min-width:140px">
-      <div style="font-size:10px;color:#3d5a78;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">PDO Term</div>
-      <div style="font-size:20px;color:#cc88ff;font-family:monospace;font-weight:bold">{len(registros_pdpw)}</div>
+    <div style="background:#fff;border:1px solid #dde1e7;padding:12px 18px;flex:1;min-width:140px">
+      <div style="font-size:10px;color:#8a94a6;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">PDO Term</div>
+      <div style="font-size:20px;color:#8b5cf6;font-family:monospace;font-weight:bold">{len(registros_pdpw)}</div>
     </div>
   </div>
   <div style="margin-bottom:20px">
-    <div style="font-size:12px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:#00c8ff;border-left:3px solid #00c8ff;padding-left:10px;margin-bottom:10px">PDO OPER TERM</div>
-    <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:12px">
+    <div style="font-size:12px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:#2d3a4a;border-left:3px solid #2d3a4a;padding-left:10px;margin-bottom:10px">PDO OPER TERM</div>
+    <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:12px;background:#fff">
       <thead><tr>{header_dat}</tr></thead>
-      <tbody>{linhas_dat or "<tr><td colspan='10' style='padding:12px;color:#3d5a78;text-align:center'>Sem dados</td></tr>"}</tbody>
+      <tbody>{linhas_dat or "<tr><td colspan='10' style='padding:12px;color:#8a94a6;text-align:center'>Sem dados</td></tr>"}</tbody>
     </table>
   </div>
   <div style="margin-bottom:20px">
-    <div style="font-size:12px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:#cc88ff;border-left:3px solid #cc88ff;padding-left:10px;margin-bottom:10px">PDO TERM ({data_pdpw})</div>
-    <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:11px">
-      <thead><tr>{header_pdpw or "<th style='padding:6px 10px;background:#111d2e'>-</th>"}</tr></thead>
-      <tbody>{linhas_pdpw or "<tr><td colspan='10' style='padding:12px;color:#3d5a78;text-align:center'>Sem dados</td></tr>"}</tbody>
+    <div style="font-size:12px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:#8b5cf6;border-left:3px solid #8b5cf6;padding-left:10px;margin-bottom:10px">PDO TERM ({data_pdpw})</div>
+    <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:11px;background:#fff">
+      <thead><tr>{header_pdpw or "<th style='padding:6px 10px;background:#f7f8fa'>-</th>"}</tr></thead>
+      <tbody>{linhas_pdpw or "<tr><td colspan='10' style='padding:12px;color:#8a94a6;text-align:center'>Sem dados</td></tr>"}</tbody>
     </table>
   </div>
-  <div style="border-top:1px solid #1e3a5f;padding-top:14px;font-size:11px;color:#6a8faf">
-    <a href="https://leandrosouza1234561.github.io/gna_dessem4/" style="color:#00c8ff;text-decoration:none">Ver dashboard</a>
+  <div style="border-top:1px solid #dde1e7;padding-top:14px;font-size:11px;color:#8a94a6">
+    <a href="https://leandrosouza1234561.github.io/gna_dessem4/" style="color:#2d3a4a;text-decoration:none">Ver dashboard</a>
     &nbsp;|&nbsp; GNA MONITOR · GITHUB ACTIONS
   </div>
 </div>"""
@@ -159,21 +159,21 @@ def verificar_e_alertar(registros):
         log.info("Sem alertas."); return
     ts = datetime.now(timezone.utc).astimezone().strftime("%d/%m/%Y %H:%M")
     linhas = "".join(
-        f"<tr><td style='padding:6px 12px;border-bottom:1px solid #1e3a5f;color:{'#00c8ff' if a['planta']=='GNA I' else '#ffaa00'}'>{a['planta']}</td>"
-        f"<td style='padding:6px 12px;border-bottom:1px solid #1e3a5f'>{a['iper']}</td>"
-        f"<td style='padding:6px 12px;border-bottom:1px solid #1e3a5f;color:#ffaa00'>{a['coluna']}</td>"
-        f"<td style='padding:6px 12px;border-bottom:1px solid #1e3a5f;color:#00e57a;text-align:right'>{a['valor']:,.2f}</td></tr>"
+        f"<tr><td style='padding:6px 12px;border-bottom:1px solid #dde1e7;color:{'#3d4d5c' if a['planta']=='GNA I' else '#e8650a'}'>{a['planta']}</td>"
+        f"<td style='padding:6px 12px;border-bottom:1px solid #dde1e7'>{a['iper']}</td>"
+        f"<td style='padding:6px 12px;border-bottom:1px solid #dde1e7;color:#e8650a'>{a['coluna']}</td>"
+        f"<td style='padding:6px 12px;border-bottom:1px solid #dde1e7;text-align:right'>{a['valor']:,.2f}</td></tr>"
         for a in alertas[:100])
-    corpo = f"""<div style="background:#090d12;padding:24px;font-family:Arial;color:#c8dff5;max-width:800px">
-      <div style="background:#0d2040;border-left:4px solid #00c8ff;padding:14px 20px;margin-bottom:20px">
-        <h2 style="margin:0;color:#fff">GNA MONITOR - ALERTA DESSEM</h2>
-        <p style="margin:4px 0 0;color:#6a8faf;font-size:12px">{ts}</p></div>
-      <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:13px;background:#0d1520">
-        <thead><tr style="background:#111d2e">
+    corpo = f"""<div style="background:#f0f2f5;padding:24px;font-family:Arial;color:#1a2333;max-width:800px">
+      <div style="background:#fff;border-left:4px solid #2d3a4a;padding:14px 20px;margin-bottom:20px">
+        <h2 style="margin:0;color:#2d3a4a">GNA MONITOR - ALERTA DESSEM</h2>
+        <p style="margin:4px 0 0;color:#8a94a6;font-size:12px">{ts}</p></div>
+      <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:13px;background:#fff">
+        <thead><tr style="background:#f7f8fa">
           <th style="padding:8px 12px;text-align:left">Planta</th><th style="padding:8px 12px;text-align:left">IPER</th>
           <th style="padding:8px 12px;text-align:left">Coluna</th><th style="padding:8px 12px;text-align:right">Valor</th>
         </tr></thead><tbody>{linhas}</tbody></table>
-      <div style="margin-top:20px"><a href="https://leandrosouza1234561.github.io/gna_dessem4/" style="color:#00c8ff">Ver dashboard</a></div>
+      <div style="margin-top:20px"><a href="https://leandrosouza1234561.github.io/gna_dessem4/" style="color:#2d3a4a">Ver dashboard</a></div>
     </div>"""
     enviar_email(f"GNA Alert - Valores detectados ({ts})", corpo)
 
@@ -206,37 +206,129 @@ def _garantir_login(page, url_destino):
     return True
 
 
+def _tentar_baixar(page, tmpdir):
+    """Tenta encontrar botao de download por multiplos seletores."""
+    # Aguarda pagina carregar completamente
+    time.sleep(5)
+
+    # Loga URL e titulo para diagnóstico
+    log.info(f"URL apos login: {page.url}")
+    log.info(f"Titulo pagina: {page.title()}")
+
+    # Lista de seletores para tentar
+    seletores = [
+        "a:has-text('Baixar')",
+        "button:has-text('Baixar')",
+        "input[value*='Baixar']",
+        "input[value*='baixar']",
+        "a:has-text('Download')",
+        "button:has-text('Download')",
+        "a:has-text('download')",
+        "a[href*='.zip']",
+        "a[href*='download']",
+        "a[href*='Download']",
+        "a[href*='zip']",
+        "img[title*='Baixar']",
+        "img[alt*='Baixar']",
+        "img[title*='baixar']",
+        "a:has-text('Transferir')",
+        "button:has-text('Transferir')",
+        "a:has-text('Exportar')",
+        "button:has-text('Exportar')",
+        "[onclick*='download']",
+        "[onclick*='Download']",
+        "[onclick*='baixar']",
+        "[onclick*='Baixar']",
+        "a.download",
+        "button.download",
+    ]
+
+    botao = None
+    for sel in seletores:
+        try:
+            els = page.locator(sel).all()
+            if els:
+                log.info(f"Botao encontrado: seletor='{sel}' count={len(els)}")
+                botao = els[0]
+                break
+        except Exception as ex:
+            log.debug(f"Seletor '{sel}' erro: {ex}")
+            continue
+
+    if not botao:
+        # Diagnóstico: loga todos os links e botões da página
+        log.error("Nenhum botao de download encontrado. Diagnostico:")
+        try:
+            links = page.locator("a").all()
+            log.info(f"Total de <a> na pagina: {len(links)}")
+            for i, lnk in enumerate(links[:30]):
+                try:
+                    txt = lnk.inner_text(timeout=2000).strip()
+                    href = lnk.get_attribute("href") or ""
+                    log.info(f"  Link[{i}] texto='{txt}' href='{href[:80]}'")
+                except Exception:
+                    pass
+            btns = page.locator("button, input[type='button'], input[type='submit']").all()
+            log.info(f"Total de botoes na pagina: {len(btns)}")
+            for i, btn in enumerate(btns[:20]):
+                try:
+                    txt = btn.inner_text(timeout=2000).strip() or btn.get_attribute("value") or ""
+                    log.info(f"  Botao[{i}] texto='{txt}'")
+                except Exception:
+                    pass
+        except Exception as ex:
+            log.error(f"Erro no diagnostico: {ex}")
+        return None
+
+    # Tenta clicar e capturar download
+    try:
+        with page.expect_download(timeout=120000) as dl:
+            botao.click()
+        zip_path = Path(tmpdir) / "deck.zip"
+        dl.value.save_as(zip_path)
+        log.info(f"ZIP baixado: {zip_path.stat().st_size} bytes")
+        return zip_path
+    except Exception as e:
+        log.error(f"Erro ao baixar apos clicar: {e}")
+        return None
+
+
 def coletar_tudo(tmpdir):
     zip_path   = None
     dados_pdpw = {"colunas": [], "registros": [], "empresa": "", "data": ""}
+
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True, args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"])
-        context = browser.new_context(viewport={"width":1600,"height":900}, locale="pt-BR", accept_downloads=True,
-            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
+        browser = pw.chromium.launch(
+            headless=True,
+            args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"]
+        )
+        context = browser.new_context(
+            viewport={"width":1600,"height":900},
+            locale="pt-BR",
+            accept_downloads=True,
+            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+        )
+
         try:
+            # ── SINTEGRE ────────────────────────────────────────────
             page = context.new_page()
-            log.info("Acessando historico SINTEGRE...")
+            log.info("Acessando SINTEGRE...")
             if not _garantir_login(page, URL_HISTORICO):
+                log.error("Login SINTEGRE falhou.")
                 page.close()
             else:
                 if "historico-de-produtos" not in page.url:
-                    page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000); time.sleep(5)
-                botoes = page.locator("a:has-text('Baixar'), button:has-text('Baixar')").all()
-                log.info(f"Botoes Baixar: {len(botoes)}")
-                if botoes:
-                    with page.expect_download(timeout=120000) as dl:
-                        botoes[0].click()
-                    zip_path = Path(tmpdir) / "deck.zip"
-                    dl.value.save_as(zip_path)
-                    log.info(f"ZIP baixado: {zip_path.stat().st_size} bytes")
-                else:
-                    log.error("Botao Baixar nao encontrado.")
+                    page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
+                    time.sleep(5)
+                zip_path = _tentar_baixar(page, tmpdir)
                 page.close()
 
+            # ── PDPW ────────────────────────────────────────────────
             log.info("Abrindo PDPW...")
             page2 = context.new_page()
             if not _garantir_login(page2, URL_PDPW_ENTRY):
                 page2.close(); return zip_path, dados_pdpw
+
             log.info(f"PDPW entry: {page2.url}")
             page2.goto(URL_PDPW_OBS, wait_until="domcontentloaded", timeout=30000); time.sleep(5)
             if "sso.ons.org.br" in page2.url or "login" in page2.url.lower():
@@ -327,10 +419,12 @@ def coletar_tudo(tmpdir):
                 log.info(f"PDPW: {len(regs)} registros | empresa={empresa_selecionada} | data={data_pagina}")
                 break
             page2.close()
+
         except Exception as e:
             log.error(f"Erro geral: {e}", exc_info=True)
         finally:
             browser.close()
+
     return zip_path, dados_pdpw
 
 
@@ -341,7 +435,7 @@ def extrair_dat(zip_path):
             if encontrado:
                 conteudo = zf.read(encontrado).decode("latin-1", errors="replace")
                 log.info(f"Extraido: {encontrado}"); return conteudo
-            log.warning(f"Nao encontrado: {ARQUIVO_DAT}")
+            log.warning(f"Nao encontrado: {ARQUIVO_DAT}. Arquivos: {zf.namelist()[:10]}")
     except Exception as e:
         log.error(f"Erro ZIP: {e}")
     return None
@@ -414,10 +508,16 @@ def salvar(conteudo_raw, dados_dat, dados_pdpw):
         except: pass
     hist.append({"timestamp":ts,"colunas":dados_dat["colunas"],"registros":dados_dat["registros"],"total":dados_dat["total_registros_gna"],"pdo_term":dados_pdpw})
     saida = {
-        "ultima_coleta":ts, "status":"ok" if (dados_dat["registros"] or dados_pdpw.get("registros")) else "sem_dados",
-        "arquivo":ARQUIVO_DAT, "colunas":dados_dat["colunas"], "raw_header":dados_dat["raw_header"],
-        "total_linhas_arquivo":dados_dat["total_linhas_arquivo"], "registros":dados_dat["registros"],
-        "total_registros_gna":dados_dat["total_registros_gna"], "pdo_term":dados_pdpw, "historico":hist[-288:],
+        "ultima_coleta":ts,
+        "status":"ok" if (dados_dat["registros"] or dados_pdpw.get("registros")) else "sem_dados",
+        "arquivo":ARQUIVO_DAT,
+        "colunas":dados_dat["colunas"],
+        "raw_header":dados_dat["raw_header"],
+        "total_linhas_arquivo":dados_dat["total_linhas_arquivo"],
+        "registros":dados_dat["registros"],
+        "total_registros_gna":dados_dat["total_registros_gna"],
+        "pdo_term":dados_pdpw,
+        "historico":hist[-288:],
     }
     JSON_FILE.write_text(json.dumps(saida, ensure_ascii=False, indent=2), encoding="utf-8")
     log.info(f"Salvo: {dados_dat['total_registros_gna']} DAT + {len(dados_pdpw.get('registros',[]))} PDPW")
@@ -432,9 +532,11 @@ def main():
     with tempfile.TemporaryDirectory() as tmpdir:
         zip_path, dados_pdpw = coletar_tudo(tmpdir)
         conteudo_dat = extrair_dat(zip_path) if zip_path else None
-        dados_dat = parsear_dat(conteudo_dat) if conteudo_dat else {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0}
+        dados_dat = parsear_dat(conteudo_dat) if conteudo_dat else {
+            "colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0
+        }
         salvar(conteudo_dat or "", dados_dat, dados_pdpw)
-        log.info("Coleta concluida com sucesso!")
+        log.info("Coleta concluida!")
         return 0
 
 if __name__ == "__main__":
