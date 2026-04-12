@@ -1,443 +1,501 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GNA GERACAO - PDO Oper Titulacao Usinas · DESSEM/ONS</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#090d12;--bg2:#0d1520;--bg3:#111d2e;--border:#1e3a5f;--border2:#2a4a70;--accent:#00c8ff;--accent2:#0080cc;--amber:#ffaa00;--green:#00e57a;--red:#ff3c5a;--text:#c8dff5;--text2:#6a8faf;--text3:#3d5a78;--gna1:#00c8ff;--gna2:#ffaa00;--mono:'Share Tech Mono',monospace;--head:'Barlow Condensed',sans-serif;--body:'Barlow',sans-serif}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;min-height:100vh;overflow-x:hidden}
-body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,200,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,200,255,0.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
-.wrap{position:relative;z-index:1;max-width:1800px;margin:0 auto;padding:16px 20px}
-header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:linear-gradient(135deg,#0a1825 0%,#0d2040 100%);border:1px solid var(--border);border-left:4px solid var(--accent);margin-bottom:16px;flex-wrap:wrap;gap:12px}
-.header-left{display:flex;align-items:center;gap:16px}
-.logo-box{width:52px;height:52px;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-family:var(--head);font-weight:900;font-size:19px;color:#000;letter-spacing:-1px;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);flex-shrink:0}
-.header-title h1{font-family:var(--head);font-weight:900;font-size:22px;letter-spacing:2px;color:#fff;text-transform:uppercase;line-height:1}
-.header-title p{font-family:var(--mono);font-size:11px;color:var(--text2);letter-spacing:1px;margin-top:4px}
-.header-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-.status-pill{display:inline-flex;align-items:center;gap:8px;padding:5px 14px;border-radius:2px;font-family:var(--mono);font-size:12px;font-weight:bold;border:1px solid;text-transform:uppercase;letter-spacing:1px}
-.status-pill.ok{color:var(--green);border-color:var(--green);background:rgba(0,229,122,.08)}
-.status-pill.error{color:var(--red);border-color:var(--red);background:rgba(255,60,90,.08)}
-.status-pill.wait{color:var(--amber);border-color:var(--amber);background:rgba(255,170,0,.08)}
-.status-pill .dot{width:8px;height:8px;border-radius:50%;animation:pulse 1.5s infinite}
-.status-pill.ok .dot{background:var(--green);box-shadow:0 0 6px var(--green)}
-.status-pill.error .dot{background:var(--red);box-shadow:0 0 6px var(--red);animation:none}
-.status-pill.wait .dot{background:var(--amber);box-shadow:0 0 6px var(--amber)}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.ts-row{font-family:var(--mono);font-size:11px;color:var(--text2);text-align:right}
-.btn-refresh-header{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;font-family:var(--mono);font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;background:rgba(0,200,255,.08);border:1px solid var(--accent);color:var(--accent);cursor:pointer;transition:all .2s}
-.btn-refresh-header:hover{background:rgba(0,200,255,.2)}
-.btn-refresh-header.loading{opacity:.5;pointer-events:none}
-.spin{display:inline-block;animation:spin .6s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.countdown-bar{height:3px;background:var(--border);margin-bottom:16px;border-radius:1px;overflow:hidden}
-.countdown-fill{height:100%;width:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));box-shadow:0 0 6px var(--accent);transition:width 1s linear}
-.erro-banner{display:none;margin-bottom:16px;padding:12px 18px;background:rgba(255,60,90,.08);border:1px solid var(--red);border-left:4px solid var(--red);font-family:var(--mono);font-size:12px;color:var(--red)}
-.meta-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
-.meta-card{background:var(--bg2);border:1px solid var(--border);padding:10px 16px;flex:1;min-width:160px}
-.meta-label{font-family:var(--head);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:4px}
-.meta-value{font-family:var(--mono);font-size:14px;color:var(--accent)}
-.period-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
-.period-label{font-family:var(--head);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text2)}
-.period-btn{padding:6px 16px;font-family:var(--mono);font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;background:var(--bg2);border:1px solid var(--border);color:var(--text2);cursor:pointer;transition:all .2s}
-.period-btn:hover{border-color:var(--accent);color:var(--accent)}
-.period-btn.active{background:rgba(0,200,255,.1);border-color:var(--accent);color:var(--accent)}
-.period-custom{display:flex;align-items:center;gap:8px;margin-left:8px}
-.period-custom input{background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:5px 10px;outline:none;cursor:pointer}
-.period-custom input:focus{border-color:var(--accent)}
-.period-custom input::-webkit-calendar-picker-indicator{filter:invert(0.5)}
-.period-info{font-family:var(--mono);font-size:11px;color:var(--text3);margin-left:auto}
-.tabs{display:flex;gap:0;margin-bottom:0;border-bottom:1px solid var(--border)}
-.tab-btn{padding:10px 24px;font-family:var(--head);font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);background:transparent;border:none;border-bottom:3px solid transparent;cursor:pointer;transition:all .2s;margin-bottom:-1px}
-.tab-btn:hover{color:var(--text)}
-.tab-btn.active.tger{color:var(--accent);border-bottom-color:var(--accent)}
-.tab-btn.active.tterm{color:#cc88ff;border-bottom-color:#cc88ff}
-.panel{background:var(--bg2);border:1px solid var(--border);border-top:none;overflow:hidden;margin-bottom:16px}
-.panel-header{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--bg3);border-bottom:1px solid var(--border);flex-wrap:wrap}
-.panel-accent{width:4px;height:20px;border-radius:1px;flex-shrink:0}
-.panel-accent.ca{background:var(--accent);box-shadow:0 0 8px var(--accent)}
-.panel-accent.ct{background:#cc88ff;box-shadow:0 0 8px #cc88ff}
-.panel-title{font-family:var(--head);font-size:15px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#fff}
-.panel-info{font-family:var(--mono);font-size:11px;color:var(--text3)}
-.btn-refresh{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;background:rgba(0,200,255,.06);border:1px solid var(--border2);color:var(--text2);cursor:pointer;transition:all .2s;margin-left:auto}
-.btn-refresh:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,200,255,.12)}
-.btn-refresh.loading{opacity:.5;pointer-events:none}
-.search-bar{padding:10px 18px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.search-input{background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 12px;outline:none;flex:1;max-width:280px}
-.search-input:focus{border-color:var(--accent)}
-.planta-filter{display:flex;gap:6px;align-items:center}
-.planta-filter-label{font-family:var(--mono);font-size:11px;color:var(--text2)}
-.planta-btn{padding:5px 14px;font-family:var(--mono);font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;background:var(--bg);border:1px solid var(--border2);color:var(--text2);cursor:pointer;transition:all .2s}
-.planta-btn:hover{border-color:var(--accent);color:var(--accent)}
-.planta-btn.active-all{background:rgba(0,200,255,.1);border-color:var(--accent);color:var(--accent)}
-.planta-btn.active-gna1{background:rgba(0,200,255,.1);border-color:var(--gna1);color:var(--gna1)}
-.planta-btn.active-gna2{background:rgba(255,170,0,.1);border-color:var(--gna2);color:var(--gna2)}
-.table-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
-thead th{padding:9px 12px;text-align:right;font-family:var(--head);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);background:rgba(0,0,0,.35);border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none}
-thead th:first-child{text-align:left}
-thead th:hover{color:var(--accent)}
-thead th.sort-asc::after{content:' ▲';color:var(--accent)}
-thead th.sort-desc::after{content:' ▼';color:var(--accent)}
-thead th.sep-col{border-left:2px solid var(--accent2);color:#cc88ff !important}
-tbody tr{border-bottom:1px solid rgba(30,58,95,.3);transition:background .12s}
-tbody tr:hover{background:rgba(0,200,255,.05)}
-tbody td{padding:8px 12px;text-align:right;white-space:nowrap}
-tbody td:first-child{text-align:left}
-.plant-gna1{color:var(--gna1);font-weight:700}
-.plant-gna2{color:var(--gna2);font-weight:700}
-.val-num{color:var(--text)}
-.val-null{color:var(--text3)}
-.val-str{color:var(--text2)}
-.val-pdpw{color:#cc88ff}
-.empty{padding:48px;text-align:center;color:var(--text3);font-family:var(--mono);font-size:13px}
-.empty .icon{font-size:36px;margin-bottom:14px;opacity:.4}
-footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:12px 0;margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--text3);border-top:1px solid var(--border)}
-.footer-badge{background:rgba(0,200,255,.06);border:1px solid rgba(0,200,255,.15);padding:3px 10px;color:var(--text2)}
-#loading{position:fixed;inset:0;background:rgba(9,13,18,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;font-family:var(--mono);color:var(--text2);gap:16px}
-.spinner{width:40px;height:40px;border:3px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
-#loading.hidden{display:none}
-</style>
-</head>
-<body>
-<div id="loading"><div class="spinner"></div><span>Carregando dados GNA...</span></div>
-<div class="wrap">
-<header>
-  <div class="header-left">
-    <div class="logo-box">GNA</div>
-    <div class="header-title">
-      <h1>GNA GERACAO - DESSEM/ONS</h1>
-      <p>pdo_oper_term.dat + PDO Term (PDPW) · SINTEGRE ONS</p>
-    </div>
-  </div>
-  <div class="header-right">
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="btn-refresh-header" id="btn-refresh-header" onclick="forcarAtualizacao()">&#8634; Atualizar</button>
-      <div class="status-pill wait" id="status-pill"><div class="dot"></div><span id="status-text">Carregando...</span></div>
-    </div>
-    <div class="ts-row"><span>COLETA: </span><span id="ts-coleta">-</span>&nbsp;|&nbsp;<span id="clock" style="color:var(--accent)"></span></div>
-  </div>
-</header>
-<div class="countdown-bar"><div id="countdown-fill" style="height:100%;width:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));box-shadow:0 0 6px var(--accent)"></div></div>
-<div class="erro-banner" id="erro-banner"><strong>ERRO:</strong> <span id="erro-msg"></span></div>
-<div class="meta-row" id="meta-row" style="display:none">
-  <div class="meta-card"><div class="meta-label">Total Registros</div><div class="meta-value" id="meta-total">-</div></div>
-  <div class="meta-card"><div class="meta-label">GNA I</div><div class="meta-value" style="color:var(--gna1)" id="meta-gna1">-</div></div>
-  <div class="meta-card"><div class="meta-label">GNA II</div><div class="meta-value" style="color:var(--gna2)" id="meta-gna2">-</div></div>
-  <div class="meta-card"><div class="meta-label">PDO Term</div><div class="meta-value" style="color:#cc88ff" id="meta-term">-</div></div>
-  <div class="meta-card"><div class="meta-label">Coletas no Periodo</div><div class="meta-value" id="meta-coletas">-</div></div>
-</div>
-<div class="period-bar" id="period-bar" style="display:none">
-  <span class="period-label">Periodo:</span>
-  <button class="period-btn active" onclick="setPeriod('hoje',this)">Hoje</button>
-  <button class="period-btn" onclick="setPeriod('ontem',this)">Ontem</button>
-  <button class="period-btn" onclick="setPeriod('7d',this)">7 dias</button>
-  <button class="period-btn" onclick="setPeriod('tudo',this)">Tudo</button>
-  <div class="period-custom">
-    <span style="font-family:var(--mono);font-size:11px;color:var(--text2)">De:</span>
-    <input type="date" id="date-from" onchange="setPeriod('custom',null)">
-    <span style="font-family:var(--mono);font-size:11px;color:var(--text2)">Ate:</span>
-    <input type="date" id="date-to" onchange="setPeriod('custom',null)">
-  </div>
-  <span class="period-info" id="period-info"></span>
-</div>
-<div class="tabs">
-  <button class="tab-btn active tger" onclick="trocarTab('ger',this)">GNA GERACAO</button>
-  <button class="tab-btn tterm" onclick="trocarTab('term',this)">PDO Term</button>
-</div>
-<div class="panel" id="tab-ger">
-  <div class="panel-header">
-    <div class="panel-accent ca"></div>
-    <span class="panel-title">GNA GERACAO</span>
-    <div class="panel-info" id="info-ger">0 REGISTROS</div>
-    <button class="btn-refresh" id="btn-ger" onclick="forcarAtualizacao('ger')">&#8634; Atualizar</button>
-  </div>
-  <div class="search-bar">
-    <input class="search-input" type="text" placeholder="Filtrar..." id="search-ger" oninput="aplicarFiltros()">
-    <div class="planta-filter">
-      <span class="planta-filter-label">PLANTA:</span>
-      <button class="planta-btn active-all" id="pbtn-all" onclick="setPlantaFiltro('all')">TODAS</button>
-      <button class="planta-btn" id="pbtn-gna1" onclick="setPlantaFiltro('GNA I')">GNA I</button>
-      <button class="planta-btn" id="pbtn-gna2" onclick="setPlantaFiltro('GNA II')">GNA II</button>
-    </div>
-  </div>
-  <div class="table-wrap"><table><thead id="thead-ger"><tr><th>-</th></tr></thead><tbody id="tbody-ger"></tbody></table></div>
-</div>
-<div class="panel" id="tab-term" style="display:none">
-  <div class="panel-header">
-    <div class="panel-accent ct"></div>
-    <span class="panel-title">PDO Term - GNA GERACAO</span>
-    <div class="panel-info" id="info-term">0 REGISTROS</div>
-    <button class="btn-refresh" id="btn-term" onclick="forcarAtualizacao('term')">&#8634; Atualizar</button>
-  </div>
-  <div class="search-bar"><input class="search-input" type="text" placeholder="Filtrar..." id="search-term" oninput="filtrarTabela('term')"></div>
-  <div class="table-wrap"><table><thead id="thead-term"><tr><th>-</th></tr></thead><tbody id="tbody-term"></tbody></table></div>
-</div>
-<footer>
-  <span>GNA MONITOR · PDO_OPER_TERM + PDO_TERM · SINTEGRE/ONS</span>
-  <span class="footer-badge">AUTO-REFRESH 5min · GITHUB ACTIONS</span>
-  <span id="clock2" style="color:var(--accent)"></span>
-</footer>
-</div>
-<script>
-let dadosGlobal=null,historicoGlobal=[],colunas=[],colunasTerm=[],sortState={col:null,dir:'asc'},tabAtual='ger',periodoAtual='hoje';
-let registrosFiltrados=[],registrosTermFiltrados=[],plantaFiltro='all';
-let proximaColeta=null;
-const PDPW_EXCLUIR=['data_pdpw','empresa','data','intervalo'];
+import json, logging, os, re, time, zipfile, io, tempfile, smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from datetime import datetime, timezone
+from pathlib import Path
+from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
-function acharColSugerido(lista,tipo){
-  return lista.find(c=>{
-    const n=c.toLowerCase().replace(/\s+/g,'');
-    if(tipo==='ggna2')return n.includes('ggna2')&&n.includes('sugerido');
-    if(tipo==='ggna1')return n.includes('ggna')&&!n.includes('ggna2')&&n.includes('sugerido');
-    return false;
-  })||null;
+ONS_USER   = os.environ.get("ONS_USER", "")
+ONS_PASS   = os.environ.get("ONS_PASS", "")
+EMAIL_PASS = os.environ.get("EMAIL_PASS", "")
+EMAIL_FROM = "leandro.souza@gna.com.br"
+EMAIL_TO   = "leandro.souza@gna.com.br"
+SMTP_HOST  = "smtp.office365.com"
+SMTP_PORT  = 587
+
+URL_HISTORICO  = "https://sintegre.ons.org.br/sites/9/51//paginas/servicos/historico-de-produtos.aspx?produto=Decks%20de%20entrada%20e%20sa%C3%ADda%20-%20Modelo%20DESSEM"
+URL_PDPW_ENTRY = "https://pdpw.ons.org.br/pdp/frmCnsEnvioEmp.aspx"
+URL_PDPW_OBS   = "https://pdpw.ons.org.br/pdp/frmCnsObservacoes.aspx"
+
+ARQUIVO_DAT = "pdo_oper_term.dat"
+
+FILTRO_GNA = {
+    "GNA I":  {"usit": "137",  "numbarra": "53"},
+    "GNA II": {"usit": "238",  "numbarra": "44327"},
 }
 
-function tick(){
-  const t=new Date().toLocaleTimeString('pt-BR',{hour12:false});
-  document.getElementById('clock').textContent=t;
-  document.getElementById('clock2').textContent=t;
-  if(proximaColeta){
-    const agora=Date.now(),prox=new Date(proximaColeta).getTime(),total=5*60*1000,restante=Math.max(0,prox-agora);
-    document.getElementById('countdown-fill').style.width=((restante/total)*100).toFixed(1)+'%';
-  }
-}
-setInterval(tick,1000);tick();
+COLUNAS_EXIBIR = ["USIT", "Nome Usit", "NomeSist", "NumBarra", "GTER", "ClinGter", "CMO", "CMB"]
+COLUNAS_ALERTA = ["GTER", "ClinGter", "CMO", "CMB"]
 
-function trocarTab(id,btn){
-  tabAtual=id;
-  ['ger','term'].forEach(t=>{document.getElementById('tab-'+t).style.display=(t===id)?'block':'none';});
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-}
+DOCS_DIR  = Path(__file__).parent / "docs"
+JSON_FILE = DOCS_DIR / "dados_gna.json"
+DOCS_DIR.mkdir(exist_ok=True)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+log = logging.getLogger("GNA-DAT")
 
-function setPlantaFiltro(planta){
-  plantaFiltro=planta;
-  document.getElementById('pbtn-all').className='planta-btn'+(planta==='all'?' active-all':'');
-  document.getElementById('pbtn-gna1').className='planta-btn'+(planta==='GNA I'?' active-gna1':'');
-  document.getElementById('pbtn-gna2').className='planta-btn'+(planta==='GNA II'?' active-gna2':'');
-  aplicarFiltros();
-}
 
-function aplicarFiltros(){
-  const q=(document.getElementById('search-ger').value||'').toLowerCase();
-  let subset=registrosFiltrados;
-  if(plantaFiltro!=='all')subset=subset.filter(r=>r.planta_id===plantaFiltro);
-  if(q)subset=subset.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q)));
-  renderTabelaGer(subset,registrosTermFiltrados);
-  document.getElementById('info-ger').textContent=subset.length+' REGISTROS';
-}
+def enviar_email(assunto, corpo_html):
+    if not EMAIL_PASS:
+        log.warning("EMAIL_PASS nao configurado.")
+        return
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = assunto
+        msg["From"]    = EMAIL_FROM
+        msg["To"]      = EMAIL_TO
+        msg.attach(MIMEText(corpo_html, "html", "utf-8"))
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as smtp:
+            smtp.ehlo(); smtp.starttls()
+            smtp.login(EMAIL_FROM, EMAIL_PASS)
+            smtp.sendmail(EMAIL_FROM, EMAIL_TO, msg.as_string())
+        log.info(f"Email enviado: {assunto}")
+    except Exception as e:
+        log.error(f"Erro email: {e}")
 
-function setPeriod(tipo,btn){
-  periodoAtual=tipo;
-  document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));
-  if(btn)btn.classList.add('active');
-  aplicarPeriodo();
-}
 
-function getDateRange(){
-  const hoje=new Date();hoje.setHours(23,59,59,999);
-  const inicio=new Date();
-  if(periodoAtual==='hoje'){inicio.setHours(0,0,0,0);}
-  else if(periodoAtual==='ontem'){inicio.setDate(inicio.getDate()-1);inicio.setHours(0,0,0,0);hoje.setDate(hoje.getDate()-1);hoje.setHours(23,59,59,999);}
-  else if(periodoAtual==='7d'){inicio.setDate(inicio.getDate()-6);inicio.setHours(0,0,0,0);}
-  else if(periodoAtual==='tudo'){return{from:new Date(0),to:new Date(9999,0)};}
-  else if(periodoAtual==='custom'){
-    const f=document.getElementById('date-from').value,t=document.getElementById('date-to').value;
-    if(!f&&!t)return{from:new Date(0),to:new Date(9999,0)};
-    return{from:f?new Date(f+'T00:00:00'):new Date(0),to:t?new Date(t+'T23:59:59'):new Date(9999,0)};
-  }
-  return{from:inicio,to:hoje};
-}
+def verificar_e_alertar(registros):
+    alertas = []
+    for reg in registros:
+        for col in COLUNAS_ALERTA:
+            val = reg.get(col)
+            if val is not None and isinstance(val, (int, float)) and val != 0:
+                alertas.append({
+                    "planta": reg.get("planta_id", ""),
+                    "iper":   reg.get("IPER", ""),
+                    "coluna": col,
+                    "valor":  val,
+                })
+    if not alertas:
+        log.info("Sem alertas.")
+        return
+    ts = datetime.now(timezone.utc).astimezone().strftime("%d/%m/%Y %H:%M")
+    linhas = "".join(
+        f"<tr>"
+        f"<td style='padding:6px 12px;border-bottom:1px solid #1e3a5f;"
+        f"color:{'#00c8ff' if a['planta']=='GNA I' else '#ffaa00'}'>{a['planta']}</td>"
+        f"<td style='padding:6px 12px;border-bottom:1px solid #1e3a5f'>{a['iper']}</td>"
+        f"<td style='padding:6px 12px;border-bottom:1px solid #1e3a5f;color:#ffaa00'>{a['coluna']}</td>"
+        f"<td style='padding:6px 12px;border-bottom:1px solid #1e3a5f;color:#00e57a;text-align:right'>{a['valor']:,.2f}</td>"
+        f"</tr>"
+        for a in alertas[:100]
+    )
+    corpo_html = f"""<div style="background:#090d12;padding:24px;font-family:Arial;color:#c8dff5;max-width:800px">
+      <div style="background:#0d2040;border-left:4px solid #00c8ff;padding:14px 20px;margin-bottom:20px">
+        <h2 style="margin:0;color:#fff">GNA MONITOR - ALERTA DESSEM</h2>
+        <p style="margin:4px 0 0;color:#6a8faf;font-size:12px">{ts}</p>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:13px;background:#0d1520">
+        <thead><tr style="background:#111d2e">
+          <th style="padding:8px 12px;text-align:left">Planta</th>
+          <th style="padding:8px 12px;text-align:left">IPER</th>
+          <th style="padding:8px 12px;text-align:left">Coluna</th>
+          <th style="padding:8px 12px;text-align:right">Valor</th>
+        </tr></thead>
+        <tbody>{linhas}</tbody>
+      </table>
+      <div style="margin-top:20px">
+        <a href="https://leandrosouza1234561.github.io/gna_dessem4/" style="color:#00c8ff">Ver dashboard</a>
+      </div>
+    </div>"""
+    enviar_email(f"GNA Alert - Valores detectados ({ts})", corpo_html)
 
-function aplicarPeriodo(){
-  if(!dadosGlobal)return;
-  const{from,to}=getDateRange();
-  const snapshots=historicoGlobal.filter(s=>{const d=new Date(s.timestamp);return d>=from&&d<=to;});
-  document.getElementById('meta-coletas').textContent=snapshots.length;
-  let info='';
-  if(snapshots.length>0){
-    const datas=snapshots.map(s=>new Date(s.timestamp));
-    info=fmtTs(new Date(Math.min(...datas)).toISOString())+' > '+fmtTs(new Date(Math.max(...datas)).toISOString());
-  }else info='Nenhuma coleta neste periodo';
-  document.getElementById('period-info').textContent=info;
-  let registros=dadosGlobal.registros||[],registrosTerm=dadosGlobal.pdo_term?.registros||[];
-  let cols=dadosGlobal.colunas||[],colsTerm=dadosGlobal.pdo_term?.colunas||[];
-  if(snapshots.length>0){
-    const u=snapshots[snapshots.length-1];
-    registros=u.registros||[];cols=u.colunas||dadosGlobal.colunas||[];
-    registrosTerm=u.pdo_term?.registros||[];colsTerm=u.pdo_term?.colunas||dadosGlobal.pdo_term?.colunas||[];
-  }
-  colunas=cols;colunasTerm=colsTerm;
-  registrosFiltrados=registros;registrosTermFiltrados=registrosTerm;
-  const gna1=registros.filter(r=>r.planta_id==='GNA I'),gna2=registros.filter(r=>r.planta_id==='GNA II');
-  document.getElementById('meta-total').textContent=registros.length;
-  document.getElementById('meta-gna1').textContent=gna1.length;
-  document.getElementById('meta-gna2').textContent=gna2.length;
-  document.getElementById('meta-term').textContent=registrosTerm.length;
-  aplicarFiltros();
-  renderTabela('term',colunasTerm,registrosTerm,true);
-  document.getElementById('info-term').textContent=registrosTerm.length+' REGISTROS';
-}
 
-async function fetchDados(silencioso=false){
-  if(!silencioso)document.getElementById('loading').classList.remove('hidden');
-  try{
-    const resp=await fetch('dados_gna.json?t='+Date.now());
-    if(!resp.ok)throw new Error('HTTP '+resp.status);
-    const d=await resp.json();
-    document.getElementById('loading').classList.add('hidden');
-    dadosGlobal=d;colunas=d.colunas||[];colunasTerm=d.pdo_term?.colunas||[];historicoGlobal=d.historico||[];
-    if(d.status==='ok')setStatus('ok','ONLINE');
-    else if(d.status==='sem_dados')setStatus('wait','SEM DADOS');
-    else if(d.status==='erro_credencial'){setStatus('error','ERRO CREDENCIAL');document.getElementById('erro-banner').style.display='block';document.getElementById('erro-msg').textContent=d.erro||'Credenciais nao configuradas.';return;}
-    else setStatus('wait',d.status||'Aguardando');
-    document.getElementById('ts-coleta').textContent=fmtTs(d.ultima_coleta);
-    document.getElementById('meta-row').style.display='flex';
-    document.getElementById('period-bar').style.display='flex';
-    if(d.ultima_coleta)proximaColeta=new Date(new Date(d.ultima_coleta).getTime()+5*60*1000).toISOString();
-    const hoje=new Date(),seteDias=new Date();seteDias.setDate(seteDias.getDate()-6);
-    document.getElementById('date-to').value=hoje.toISOString().split('T')[0];
-    document.getElementById('date-from').value=seteDias.toISOString().split('T')[0];
-    aplicarPeriodo();
-  }catch(err){
-    document.getElementById('loading').classList.add('hidden');
-    setStatus('error','Erro: '+err.message);
-    document.getElementById('erro-banner').style.display='block';
-    document.getElementById('erro-msg').textContent=err.message;
-  }
-}
+def fazer_login_keycloak(page):
+    log.info(f"Login Keycloak. URL: {page.url}")
+    try:
+        campo_user = page.locator("#username, input[name='username'], input[type='text']").first
+        campo_user.wait_for(timeout=15000)
+        campo_user.fill(ONS_USER)
+        time.sleep(1)
+        campo_pass = page.locator("#password, input[name='password'], input[type='password']").first
+        campo_pass.wait_for(timeout=10000)
+        campo_pass.fill(ONS_PASS)
+        time.sleep(1)
+        page.locator("#kc-login, input[type='submit'], button[type='submit']").first.click()
+        page.wait_for_function(
+            "() => !window.location.href.includes('sso.ons.org.br')", timeout=60000
+        )
+        log.info(f"Autenticado! URL: {page.url}")
+        time.sleep(3)
+        return True
+    except Exception as e:
+        log.error(f"Erro login: {e}")
+        return False
 
-async function forcarAtualizacao(aba){
-  const btnId=aba?'btn-'+aba:'btn-refresh-header',btn=document.getElementById(btnId);
-  if(btn){btn.classList.add('loading');btn.innerHTML='<span class="spin">&#8634;</span> Atualizando...';}
-  setStatus('wait','Atualizando...');
-  await fetchDados(true);
-  if(btn){btn.classList.remove('loading');btn.innerHTML='&#8634; Atualizar';}
-}
 
-function setStatus(tipo,texto){
-  document.getElementById('status-pill').className='status-pill '+tipo;
-  document.getElementById('status-text').textContent=texto;
-}
+def _garantir_login(page, url_destino):
+    page.goto(url_destino, wait_until="domcontentloaded", timeout=30000)
+    time.sleep(4)
+    if "sso.ons.org.br" in page.url or "login" in page.url.lower():
+        if not fazer_login_keycloak(page):
+            return False
+        page.goto(url_destino, wait_until="domcontentloaded", timeout=30000)
+        time.sleep(4)
+    if "sso.ons.org.br" in page.url or "login" in page.url.lower():
+        if not fazer_login_keycloak(page):
+            return False
+        page.goto(url_destino, wait_until="domcontentloaded", timeout=30000)
+        time.sleep(4)
+    return True
 
-function fmtTs(iso){
-  if(!iso)return '-';
-  return new Date(iso).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',timeZoneName:'short'});
-}
 
-function fmtCell(v,isPdpw=false){
-  if(v===null||v===undefined)return '<span class="val-null">-</span>';
-  if(typeof v==='number'){
-    const s=Number.isInteger(v)?v.toLocaleString('pt-BR'):v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:4});
-    return isPdpw?'<span class="val-pdpw">'+s+'</span>':'<span class="val-num">'+s+'</span>';
-  }
-  return isPdpw?'<span class="val-pdpw">'+v+'</span>':'<span class="val-str">'+v+'</span>';
-}
+def coletar_tudo(tmpdir):
+    zip_path   = None
+    dados_pdpw = {"colunas": [], "registros": [], "empresa": "", "data": ""}
 
-function renderTabelaGer(registros,registrosTerm){
-  const thead=document.getElementById('thead-ger'),tbody=document.getElementById('tbody-ger');
-  if(!registros.length){
-    thead.innerHTML='<tr><th style="text-align:left">-</th></tr>';
-    tbody.innerHTML='<tr><td><div class="empty"><div class="icon">&#128235;</div>Nenhum registro neste periodo.</div></td></tr>';
-    return;
-  }
-  const todasCols=new Set();
-  registros.forEach(r=>Object.keys(r).forEach(k=>{if(k!=='planta_id')todasCols.add(k)}));
-  const colsDat=colunas.filter(c=>todasCols.has(c)).concat([...todasCols].filter(c=>!colunas.includes(c)).sort());
-  const colsTermLimpas=colunasTerm.filter(c=>!PDPW_EXCLUIR.some(ex=>c.toLowerCase().includes(ex)));
-  const keyGgna1=acharColSugerido(colsTermLimpas,'ggna1');
-  const keyGgna2=acharColSugerido(colsTermLimpas,'ggna2');
-  const pdpwCols=[];
-  if(keyGgna1)pdpwCols.push({label:'GGNA Sugerido',key:keyGgna1});
-  if(keyGgna2)pdpwCols.push({label:'GGNA2 Sugerido',key:keyGgna2});
-  const thsDat=colsDat.map((c,i)=>{
-    const cls=sortState.col===c?(sortState.dir==='asc'?' class="sort-asc"':' class="sort-desc"'):'';
-    return `<th${cls} onclick="sortByGer('${c}')" ${i===0?'style="text-align:left"':''}>${c}</th>`;
-  }).join('');
-  const thsTerm=pdpwCols.map((c,i)=>`<th class="sep-col" style="${i===0?'border-left:2px solid var(--accent2);':''}">${c.label}</th>`).join('');
-  thead.innerHTML=`<tr><th style="text-align:left;cursor:pointer" onclick="sortByGer('planta_id')">PLANTA</th>${thsDat}${thsTerm}</tr>`;
-  let cg1=0,cg2=0;
-  tbody.innerHTML=registros.map(r=>{
-    const isGna1=r.planta_id==='GNA I';
-    const tdPlanta=`<td class="${isGna1?'plant-gna1':'plant-gna2'}">${isGna1?'GNA I':'GNA II'}</td>`;
-    const tdsDat=colsDat.map((c,i)=>`<td ${i===0?'style="text-align:left"':''}>${fmtCell(r[c])}</td>`).join('');
-    let tdsTerm='';
-    if(pdpwCols.length>0){
-      const rowIdx=isGna1?cg1:cg2,termReg=registrosTerm[rowIdx]||null;
-      if(isGna1)cg1++;else cg2++;
-      tdsTerm=pdpwCols.map((c,i)=>`<td style="${i===0?'border-left:2px solid rgba(0,128,204,0.3);':''}">${fmtCell(termReg?termReg[c.key]:null,true)}</td>`).join('');
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+        )
+        context = browser.new_context(
+            viewport={"width": 1600, "height": 900},
+            locale="pt-BR",
+            accept_downloads=True,
+            user_agent=(
+                "Mozilla/5.0 (X11; Linux x86_64) "
+                "AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+            ),
+        )
+
+        try:
+            page = context.new_page()
+            log.info("Acessando historico SINTEGRE...")
+            if not _garantir_login(page, URL_HISTORICO):
+                page.close()
+            else:
+                if "historico-de-produtos" not in page.url:
+                    page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
+                    time.sleep(5)
+                botoes = page.locator("a:has-text('Baixar'), button:has-text('Baixar')").all()
+                log.info(f"Botoes Baixar: {len(botoes)}")
+                if botoes:
+                    with page.expect_download(timeout=120000) as dl:
+                        botoes[0].click()
+                    zip_path = Path(tmpdir) / "deck.zip"
+                    dl.value.save_as(zip_path)
+                    log.info(f"ZIP baixado: {zip_path.stat().st_size} bytes")
+                else:
+                    log.error("Botao Baixar nao encontrado no SINTEGRE.")
+                page.close()
+
+            log.info("Abrindo PDPW (frmCnsEnvioEmp)...")
+            page2 = context.new_page()
+            if not _garantir_login(page2, URL_PDPW_ENTRY):
+                page2.close()
+                return zip_path, dados_pdpw
+            log.info(f"PDPW entry URL: {page2.url}")
+
+            log.info("Navegando para frmCnsObservacoes (Comentarios DESSEM)...")
+            page2.goto(URL_PDPW_OBS, wait_until="domcontentloaded", timeout=30000)
+            time.sleep(5)
+            if "sso.ons.org.br" in page2.url or "login" in page2.url.lower():
+                if not fazer_login_keycloak(page2):
+                    page2.close()
+                    return zip_path, dados_pdpw
+                page2.goto(URL_PDPW_OBS, wait_until="domcontentloaded", timeout=30000)
+                time.sleep(5)
+            log.info(f"PDPW obs URL: {page2.url}")
+
+            data_pagina = ""
+            try:
+                candidatos = page2.locator(
+                    "span[id*='dat'], input[id*='dat'], "
+                    "label:has-text('Data'), td:has-text('Data')"
+                ).all()
+                for el in candidatos:
+                    txt = el.inner_text(timeout=3000).strip()
+                    if re.search(r'\d{2}/\d{2}/\d{4}', txt):
+                        data_pagina = txt
+                        break
+                if not data_pagina:
+                    page_text = page2.inner_text("body")
+                    m = re.search(r'\d{2}/\d{2}/\d{4}', page_text)
+                    data_pagina = m.group(0) if m else datetime.now().strftime("%d/%m/%Y")
+                log.info(f"Data PDPW: {data_pagina}")
+            except Exception as e:
+                data_pagina = datetime.now().strftime("%d/%m/%Y")
+                log.warning(f"Data nao encontrada ({e}), usando hoje: {data_pagina}")
+
+            empresa_selecionada = ""
+            try:
+                selects = page2.locator("select").all()
+                for sel in selects:
+                    opts = sel.locator("option").all()
+                    for opt in opts:
+                        txt = opt.inner_text().strip()
+                        if "GNA" in txt.upper() and "GERA" in txt.upper():
+                            sel.select_option(label=txt)
+                            empresa_selecionada = txt
+                            log.info(f"Empresa selecionada: {txt}")
+                            time.sleep(5)
+                            break
+                    if empresa_selecionada:
+                        break
+                if not empresa_selecionada:
+                    log.warning("Empresa GNA GERACAO nao encontrada nos selects.")
+            except Exception as e:
+                log.warning(f"Erro ao selecionar empresa: {e}")
+
+            tabelas = page2.locator("table").all()
+            log.info(f"Tabelas encontradas no PDPW: {len(tabelas)}")
+
+            for tabela in tabelas:
+                html = tabela.inner_html()
+                if not (
+                    "GGNA" in html or "00:00" in html
+                    or "Intervalo" in html or "Meia" in html
+                ):
+                    continue
+
+                log.info("Tabela PDPW identificada!")
+                linhas = tabela.locator("tr").all()
+                if len(linhas) < 2:
+                    continue
+
+                def _limpar_celula(texto):
+                    return [p.strip() for p in re.split(r'[\t\n]+', texto) if p.strip()]
+
+                def _extrair_cabecalho(linha_el):
+                    cols = []
+                    for cel in linha_el.locator("th,td").all():
+                        partes = _limpar_celula(cel.inner_text())
+                        cols.extend(partes if partes else [""])
+                    return cols
+
+                def _extrair_celulas(linha_el):
+                    cols = []
+                    for cel in linha_el.locator("td").all():
+                        partes = _limpar_celula(cel.inner_text())
+                        cols.extend(partes if partes else [""])
+                    return cols
+
+                cab1 = _extrair_cabecalho(linhas[0])
+                cab2 = _extrair_cabecalho(linhas[1])
+
+                SUBHEADER_KEYWORDS = {
+                    "dessem", "sugerido", "total", "intervalo",
+                    "programado", "meia hora", "ggna", "ggna2",
+                }
+                eh_subheader = any(c.lower() in SUBHEADER_KEYWORDS for c in cab2)
+
+                if eh_subheader:
+                    colunas_pdpw = []
+                    for i in range(max(len(cab1), len(cab2))):
+                        c1 = cab1[i] if i < len(cab1) else ""
+                        c2 = cab2[i] if i < len(cab2) else ""
+                        if c1 and c2 and c1 != c2:
+                            colunas_pdpw.append(f"{c1} {c2}".strip())
+                        elif c1:
+                            colunas_pdpw.append(c1)
+                        else:
+                            colunas_pdpw.append(c2)
+                    inicio = 2
+                else:
+                    colunas_pdpw = cab1
+                    inicio = 1
+
+                log.info(f"Colunas PDPW ({len(colunas_pdpw)}): {colunas_pdpw}")
+
+                regs = []
+                for linha in linhas[inicio:]:
+                    celulas = _extrair_celulas(linha)
+                    if not celulas or len(celulas) < 2:
+                        continue
+                    linha_txt = " ".join(celulas).upper()
+                    tem_ggna = "GGNA" in linha_txt
+                    tem_hora = bool(re.match(r'^\d{2}:\d{2}', celulas[0]))
+                    if not tem_ggna and not tem_hora:
+                        continue
+                    reg = {"empresa": empresa_selecionada, "data_pdpw": data_pagina}
+                    for j, col in enumerate(colunas_pdpw):
+                        reg[col] = _parse(celulas[j]) if j < len(celulas) else None
+                    regs.append(reg)
+
+                regs = regs[:48]
+                dados_pdpw = {
+                    "colunas":   colunas_pdpw,
+                    "registros": regs,
+                    "empresa":   empresa_selecionada,
+                    "data":      data_pagina,
+                }
+                log.info(f"PDPW: {len(regs)} registros | empresa={empresa_selecionada} | data={data_pagina}")
+                break
+
+            page2.close()
+
+        except Exception as e:
+            log.error(f"Erro geral na coleta: {e}", exc_info=True)
+        finally:
+            browser.close()
+
+    return zip_path, dados_pdpw
+
+
+def extrair_dat(zip_path):
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            arquivos = zf.namelist()
+            encontrado = next(
+                (n for n in arquivos if ARQUIVO_DAT.lower() in n.lower()), None
+            )
+            if encontrado:
+                conteudo = zf.read(encontrado).decode("latin-1", errors="replace")
+                log.info(f"Extraido: {encontrado}")
+                return conteudo
+            log.warning(f"Nao encontrado: {ARQUIVO_DAT}. Arquivos: {arquivos[:10]}")
+    except Exception as e:
+        log.error(f"Erro ao abrir ZIP: {e}")
+    return None
+
+
+def parsear_dat(conteudo):
+    linhas = conteudo.splitlines()
+    cab_idx, cab_raw, colunas = None, "", []
+
+    for i, linha in enumerate(linhas):
+        if linha.strip().startswith(("-", "&", "%", "/")):
+            continue
+        if re.search(r'[A-Z]+\s*:', linha) and ";" not in linha:
+            continue
+        if re.search(r'\bIPER\b', linha, re.I) and ";" in linha:
+            partes = [c.strip() for c in linha.split(";") if c.strip()]
+            if len(partes) >= 3:
+                cab_idx, cab_raw, colunas = i, linha, partes
+                log.info(f"Cabecalho linha {i}: {colunas}")
+                break
+
+    if cab_idx is None:
+        return {
+            "colunas": [], "registros": [], "raw_header": "",
+            "total_linhas_arquivo": len(linhas), "total_registros_gna": 0,
+        }
+
+    def idx_col(nome):
+        for j, c in enumerate(colunas):
+            if nome.lower() in c.lower():
+                return j
+        return -1
+
+    idx_usit     = idx_col("USIT")
+    idx_nome     = idx_col("Nome")
+    idx_numbarra = idx_col("NumBarra") if idx_col("NumBarra") >= 0 else idx_col("Barra")
+
+    registros = []
+    for linha in linhas[cab_idx + 1:]:
+        linha = linha.rstrip()
+        if not linha or linha.strip().startswith(("-", "&", "%", "/")):
+            continue
+        campos = [c.strip() for c in linha.split(";")]
+        if len(campos) < 4:
+            continue
+        nome_usina = campos[idx_nome].upper() if idx_nome >= 0 and idx_nome < len(campos) else ""
+        usit_val   = campos[idx_usit]     if idx_usit     >= 0 and idx_usit     < len(campos) else ""
+        barra_val  = campos[idx_numbarra] if idx_numbarra >= 0 and idx_numbarra < len(campos) else ""
+        planta_id = None
+        if "GNA" in nome_usina:
+            planta_id = "GNA II" if ("II" in nome_usina or " 2" in nome_usina) else "GNA I"
+        if not planta_id:
+            continue
+        filtro = FILTRO_GNA.get(planta_id)
+        if filtro and (usit_val != filtro["usit"] or barra_val != filtro["numbarra"]):
+            continue
+        reg = {"planta_id": planta_id}
+        for j, col in enumerate(colunas):
+            col_limpo = col.strip()
+            exibir = any(
+                e.lower() in col_limpo.lower() or col_limpo.lower() in e.lower()
+                for e in COLUNAS_EXIBIR
+            )
+            if exibir and j < len(campos):
+                reg[col_limpo] = _parse(campos[j])
+        registros.append(reg)
+
+    colunas_exibir = [
+        c.strip() for c in colunas
+        if any(e.lower() in c.lower() or c.lower() in e.lower() for e in COLUNAS_EXIBIR)
+    ]
+    log.info(f"Total registros GNA no DAT: {len(registros)}")
+    return {
+        "colunas":              colunas_exibir,
+        "registros":            registros,
+        "raw_header":           cab_raw,
+        "total_linhas_arquivo": len(linhas),
+        "total_registros_gna":  len(registros),
     }
-    return '<tr>'+tdPlanta+tdsDat+tdsTerm+'</tr>';
-  }).join('');
-}
 
-function renderTabela(id,cols,registros,incluirPlanta=false){
-  const thead=document.getElementById('thead-'+id),tbody=document.getElementById('tbody-'+id);
-  if(!registros.length){
-    thead.innerHTML='<tr><th style="text-align:left">-</th></tr>';
-    tbody.innerHTML='<tr><td><div class="empty"><div class="icon">&#128235;</div>Nenhum registro neste periodo.</div></td></tr>';
-    return;
-  }
-  const todasCols=new Set();
-  registros.forEach(r=>Object.keys(r).forEach(k=>{if(k!=='planta_id')todasCols.add(k)}));
-  const colsFinal=cols.filter(c=>todasCols.has(c)).concat([...todasCols].filter(c=>!cols.includes(c)).sort());
-  const thPlanta=incluirPlanta?`<th style="text-align:left;cursor:pointer" onclick="sortBy('${id}','planta_id')">PLANTA</th>`:'';
-  thead.innerHTML='<tr>'+thPlanta+colsFinal.map((c,i)=>{
-    const cls=sortState.col===c?(sortState.dir==='asc'?' class="sort-asc"':' class="sort-desc"'):'';
-    return `<th${cls} onclick="sortBy('${id}','${c}')" ${i===0?'style="text-align:left"':''}>${c}</th>`;
-  }).join('')+'</tr>';
-  tbody.innerHTML=registros.map(r=>{
-    const tdPlanta=incluirPlanta?`<td class="${r.planta_id==='GNA I'?'plant-gna1':'plant-gna2'}">${r.planta_id||'-'}</td>`:'';
-    return '<tr>'+tdPlanta+colsFinal.map((c,i)=>`<td ${i===0?'style="text-align:left"':''}>${fmtCell(r[c])}</td>`).join('')+'</tr>';
-  }).join('');
-}
 
-function sortByGer(col){
-  const q=(document.getElementById('search-ger').value||'').toLowerCase();
-  let regs=registrosFiltrados;
-  if(plantaFiltro!=='all')regs=regs.filter(r=>r.planta_id===plantaFiltro);
-  if(q)regs=regs.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q)));
-  if(sortState.col===col)sortState.dir=sortState.dir==='asc'?'desc':'asc';
-  else{sortState.col=col;sortState.dir='asc';}
-  const dir=sortState.dir==='asc'?1:-1;
-  regs.sort((a,b)=>{
-    const av=a[col],bv=b[col];
-    if(av==null&&bv==null)return 0;if(av==null)return 1;if(bv==null)return -1;
-    if(typeof av==='number'&&typeof bv==='number')return(av-bv)*dir;
-    return String(av).localeCompare(String(bv))*dir;
-  });
-  renderTabelaGer(regs,registrosTermFiltrados);
-}
+def _parse(t):
+    if not t or t in ["-", "N/A", "*", ""]:
+        return None
+    try:
+        return int(t)
+    except Exception:
+        pass
+    try:
+        return float(t.replace(",", "."))
+    except Exception:
+        return t
 
-function sortBy(id,col){
-  const regs=id==='term'?registrosTermFiltrados:registrosFiltrados;
-  if(!regs.length)return;
-  if(sortState.col===col)sortState.dir=sortState.dir==='asc'?'desc':'asc';
-  else{sortState.col=col;sortState.dir='asc';}
-  const dir=sortState.dir==='asc'?1:-1;
-  regs.sort((a,b)=>{
-    const av=a[col],bv=b[col];
-    if(av==null&&bv==null)return 0;if(av==null)return 1;if(bv==null)return -1;
-    if(typeof av==='number'&&typeof bv==='number')return(av-bv)*dir;
-    return String(av).localeCompare(String(bv))*dir;
-  });
-  renderTabela(id,id==='term'?colunasTerm:colunas,regs,id==='term');
-}
 
-function filtrarTabela(id){
-  const q=(document.getElementById('search-'+id).value||'').toLowerCase();
-  let subset=id==='term'?registrosTermFiltrados:registrosFiltrados;
-  if(q)subset=subset.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q)));
-  renderTabela(id,id==='term'?colunasTerm:colunas,subset,id==='term');
-}
+def salvar(conteudo_raw, dados_dat, dados_pdpw):
+    ts = datetime.now(timezone.utc).isoformat()
+    if conteudo_raw:
+        (DOCS_DIR / ARQUIVO_DAT).write_text(conteudo_raw, encoding="utf-8", errors="replace")
+    hist = []
+    if JSON_FILE.exists():
+        try:
+            hist = json.loads(JSON_FILE.read_text()).get("historico", [])
+        except Exception:
+            pass
+    snapshot = {
+        "timestamp": ts,
+        "colunas":   dados_dat["colunas"],
+        "registros": dados_dat["registros"],
+        "total":     dados_dat["total_registros_gna"],
+        "pdo_term":  dados_pdpw,
+    }
+    hist.append(snapshot)
+    saida = {
+        "ultima_coleta":        ts,
+        "status":               "ok" if (dados_dat["registros"] or dados_pdpw.get("registros")) else "sem_dados",
+        "arquivo":              ARQUIVO_DAT,
+        "colunas":              dados_dat["colunas"],
+        "raw_header":           dados_dat["raw_header"],
+        "total_linhas_arquivo": dados_dat["total_linhas_arquivo"],
+        "registros":            dados_dat["registros"],
+        "total_registros_gna":  dados_dat["total_registros_gna"],
+        "pdo_term":             dados_pdpw,
+        "historico":            hist[-288:],
+    }
+    JSON_FILE.write_text(json.dumps(saida, ensure_ascii=False, indent=2), encoding="utf-8")
+    log.info(
+        f"Salvo: {dados_dat['total_registros_gna']} registros DAT + "
+        f"{len(dados_pdpw.get('registros', []))} registros PDPW"
+    )
+    verificar_e_alertar(dados_dat["registros"])
+    return saida
 
-fetchDados();
-setInterval(()=>fetchDados(true),5*60*1000);
-</script>
-</body>
-</html>
+
+def main():
+    if not ONS_PASS:
+        log.error("ONS_PASS nao definido!")
+        return 1
+    with tempfile.TemporaryDirectory() as tmpdir:
+        zip_path, dados_pdpw = coletar_tudo(tmpdir)
+        conteudo_dat = extrair_dat(zip_path) if zip_path else None
+        dados_dat = (
+            parsear_dat(conteudo_dat)
+            if conteudo_dat
+            else {
+                "colunas": [], "registros": [], "raw_header": "",
+                "total_linhas_arquivo": 0, "total_registros_gna": 0,
+            }
+        )
+        salvar(conteudo_dat or "", dados_dat, dados_pdpw)
+        log.info("Coleta concluida com sucesso!")
+        return 0
+
+
+if __name__ == "__main__":
+    exit(main())
