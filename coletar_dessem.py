@@ -6,37 +6,34 @@ from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 ONS_USER = os.environ.get("ONS_USER", "")
 ONS_PASS = os.environ.get("ONS_PASS", "")
 URL_HISTORICO = "https://sintegre.ons.org.br/sites/9/51//paginas/servicos/historico-de-produtos.aspx?produto=Decks%20de%20entrada%20e%20sa%C3%ADda%20-%20Modelo%20DESSEM"
-ARQUIVO_DAT  = "pdo_oper_titulacao_usinas.dat"
+
+ARQUIVOS_DAT = {
+    "pdo_oper_titulacao_usinas.dat": {"col_nome": 2},
+    "pdo_term.dat":                  {"col_nome": 3},
+}
+PLANTAS_ALVO = ["GNA I","GNA II","GNA 1","GNA 2","GNAI","GNAII","UTE GNA"]
 DOCS_DIR  = Path(__file__).parent / "docs"
 JSON_FILE = DOCS_DIR / "dados_gna.json"
-RAW_FILE  = DOCS_DIR / "pdo_oper_titulacao_usinas.dat"
 DOCS_DIR.mkdir(exist_ok=True)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("GNA-DAT")
 
 def fazer_login_keycloak(page):
-    """Login no SSO Keycloak da ONS."""
     log.info(f"Login Keycloak. URL: {page.url}")
     try:
-        # Keycloak usa id="username" e id="password"
         campo_user = page.locator("#username, input[name='username'], input[type='text']").first
         campo_user.wait_for(timeout=15000)
         campo_user.fill(ONS_USER)
         log.info("Usuario preenchido.")
         time.sleep(1)
-
         campo_pass = page.locator("#password, input[name='password'], input[type='password']").first
         campo_pass.wait_for(timeout=10000)
         campo_pass.fill(ONS_PASS)
         log.info("Senha preenchida.")
         time.sleep(1)
-
-        # Botao login do Keycloak
         botao = page.locator("#kc-login, input[type='submit'], button[type='submit']").first
         botao.click()
         log.info("Login submetido.")
-
-        # Aguarda sair do SSO
         page.wait_for_function(
             "() => !window.location.href.includes('sso.ons.org.br')",
             timeout=60000
@@ -44,10 +41,8 @@ def fazer_login_keycloak(page):
         log.info(f"Autenticado! URL: {page.url}")
         time.sleep(3)
         return True
-
     except Exception as e:
-        log.error(f"Erro login Keycloak: {e}")
-        log.info(f"URL atual: {page.url}")
+        log.error(f"Erro login: {e}")
         return False
 
 def login_e_baixar(tmpdir):
@@ -64,91 +59,91 @@ def login_e_baixar(tmpdir):
             log.info("Acessando historico SINTEGRE...")
             page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
             time.sleep(4)
-            log.info(f"URL inicial: {page.url}")
-
-            # Se redirecionou para SSO/Keycloak
+            log.info(f"URL: {page.url}")
             if "sso.ons.org.br" in page.url:
                 ok = fazer_login_keycloak(page)
-                if not ok:
-                    return None
-                # Navega de volta para o historico
+                if not ok: return None
                 if "historico-de-produtos" not in page.url:
-                    log.info("Voltando ao historico...")
                     page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
                     time.sleep(4)
-
-            log.info(f"Pagina final: {page.title()} | {page.url}")
-
-            # Procura botao Baixar
+            log.info(f"Pagina: {page.title()}")
             botoes = page.locator("a:has-text('Baixar'), button:has-text('Baixar')").all()
             log.info(f"Botoes Baixar: {len(botoes)}")
-
             if not botoes:
                 log.error("Botao nao encontrado.")
-                log.info(f"HTML preview: {page.content()[:800]}")
                 return None
-
             with page.expect_download(timeout=120000) as dl:
                 botoes[0].click()
                 log.info("Clicou Baixar!")
-
             download = dl.value
             zip_path = Path(tmpdir) / "deck.zip"
             download.save_as(zip_path)
-            log.info(f"ZIP salvo: {zip_path.stat().st_size} bytes")
+            log.info(f"ZIP: {zip_path.stat().st_size} bytes")
             return zip_path
-
         except Exception as e:
             log.error(f"Erro: {e}", exc_info=True)
             return None
         finally:
             browser.close()
 
-def extrair_dat(zip_path):
+def extrair_arquivos(zip_path):
+    """Extrai todos os arquivos .dat de interesse do ZIP."""
+    resultados = {}
     try:
         with zipfile.ZipFile(zip_path) as zf:
-            arquivos = zf.namelist()
-            log.info(f"ZIP conteudo: {arquivos}")
-            dat = next((n for n in arquivos if ARQUIVO_DAT.lower() in n.lower()), None)
-            if not dat: dat = next((n for n in arquivos if "pdo_oper" in n.lower()), None)
-            if not dat: dat = next((n for n in arquivos if n.lower().endswith(".dat")), None)
-            if not dat: return None
-            log.info(f"Extraindo: {dat}")
-            return zf.read(dat).decode("latin-1", errors="replace")
+            arquivos_zip = zf.namelist()
+            log.info(f"ZIP conteudo ({len(arquivos_zip)} arquivos)")
+            for nome_alvo in ARQUIVOS_DAT:
+                encontrado = next((n for n in arquivos_zip if nome_alvo.lower() in n.lower()), None)
+                if encontrado:
+                    conteudo = zf.read(encontrado).decode("latin-1", errors="replace")
+                    resultados[nome_alvo] = conteudo
+                    log.info(f"Extraido: {encontrado} ({len(conteudo)} chars)")
+                else:
+                    log.warning(f"Nao encontrado no ZIP: {nome_alvo}")
     except Exception as e:
-        log.error(f"Erro ZIP: {e}"); return None
+        log.error(f"Erro ZIP: {e}")
+    return resultados
 
-def parsear_dat(conteudo):
+def parsear_dat(conteudo, col_nome=2):
+    """Parseia arquivo .dat separado por ; filtrando GNA I e II."""
     linhas = conteudo.splitlines()
     log.info(f"Total linhas: {len(linhas)}")
     cab_idx, cab_raw, colunas = None, "", []
+
     for i, linha in enumerate(linhas):
-        if re.search(r'\bIPER\b', linha, re.I) and re.search(r'\bUsit\b|\bNome\b', linha, re.I):
+        if linha.strip().startswith(("-","&","%","/")):
+            continue
+        if re.search(r'\bIPER\b', linha, re.I):
             cab_idx = i
             cab_raw = linha
             colunas = [c.strip() for c in linha.split(";") if c.strip()]
             log.info(f"Cabecalho linha {i}: {colunas}")
             break
+
     if cab_idx is None:
         log.warning("Cabecalho nao encontrado!")
         return {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":len(linhas),"total_registros_gna":0}
+
     registros = []
     for linha in linhas[cab_idx+1:]:
         linha = linha.rstrip()
         if not linha or linha.strip().startswith(("-","&","%","/")):
             continue
         campos = [c.strip() for c in linha.split(";")]
-        if len(campos) < 3: continue
-        nome_usina = campos[2].upper() if len(campos) > 2 else ""
+        if len(campos) <= col_nome:
+            continue
+        nome_usina = campos[col_nome].upper()
         planta_id = None
         if "GNA" in nome_usina:
             planta_id = "GNA II" if ("II" in nome_usina or " 2" in nome_usina) else "GNA I"
-        if not planta_id: continue
+        if not planta_id:
+            continue
         reg = {"planta_id": planta_id}
         for j, col in enumerate(colunas):
             reg[col] = _parse(campos[j]) if j < len(campos) else None
         registros.append(reg)
-        log.info(f"  -> {planta_id}: {reg}")
+
     log.info(f"Total GNA: {len(registros)}")
     return {"colunas":colunas,"registros":registros,"raw_header":cab_raw,
             "total_linhas_arquivo":len(linhas),"total_registros_gna":len(registros)}
@@ -160,20 +155,69 @@ def _parse(t):
     try: return float(t.replace(",","."))
     except: return t
 
-def salvar(raw, dados):
+def salvar(dados_por_arquivo):
     ts = datetime.now(timezone.utc).isoformat()
-    if raw: RAW_FILE.write_text(raw, encoding="utf-8", errors="replace")
+
+    # Salva arquivos raw
+    for nome, conteudo in dados_por_arquivo.items():
+        if conteudo:
+            raw_path = DOCS_DIR / nome
+            raw_path.write_text(conteudo, encoding="utf-8", errors="replace")
+            log.info(f"Raw salvo: {raw_path}")
+
+    # Carrega historico
     hist = []
     if JSON_FILE.exists():
         try: hist = json.loads(JSON_FILE.read_text()).get("historico", [])
         except: pass
-    hist.append({"timestamp":ts,"colunas":dados["colunas"],"registros":dados["registros"],"total":dados["total_registros_gna"]})
-    saida = {"ultima_coleta":ts,"status":"ok" if dados["registros"] else "sem_dados",
-             "arquivo":ARQUIVO_DAT,"colunas":dados["colunas"],"raw_header":dados["raw_header"],
-             "total_linhas_arquivo":dados["total_linhas_arquivo"],"registros":dados["registros"],
-             "total_registros_gna":dados["total_registros_gna"],"historico":hist[-288:]}
-    JSON_FILE.write_text(json.dumps(saida,ensure_ascii=False,indent=2),encoding="utf-8")
-    log.info(f"Salvo: {dados['total_registros_gna']} registros")
+
+    # Monta dados parseados
+    dados_parseados = {}
+    for nome_arquivo, cfg in ARQUIVOS_DAT.items():
+        conteudo = dados_por_arquivo.get(nome_arquivo, "")
+        if conteudo:
+            dados_parseados[nome_arquivo] = parsear_dat(conteudo, cfg["col_nome"])
+        else:
+            dados_parseados[nome_arquivo] = {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0}
+
+    # Dados principais (pdo_oper_titulacao_usinas.dat)
+    principal = dados_parseados.get("pdo_oper_titulacao_usinas.dat", {})
+    pdo_term  = dados_parseados.get("pdo_term.dat", {})
+
+    snapshot = {
+        "timestamp": ts,
+        "colunas": principal.get("colunas", []),
+        "registros": principal.get("registros", []),
+        "total": principal.get("total_registros_gna", 0),
+        "pdo_term": {
+            "colunas": pdo_term.get("colunas", []),
+            "registros": pdo_term.get("registros", []),
+            "total": pdo_term.get("total_registros_gna", 0),
+        }
+    }
+    hist.append(snapshot)
+    hist = hist[-288:]
+
+    saida = {
+        "ultima_coleta": ts,
+        "status": "ok" if principal.get("registros") or pdo_term.get("registros") else "sem_dados",
+        "colunas": principal.get("colunas", []),
+        "raw_header": principal.get("raw_header", ""),
+        "total_linhas_arquivo": principal.get("total_linhas_arquivo", 0),
+        "registros": principal.get("registros", []),
+        "total_registros_gna": principal.get("total_registros_gna", 0),
+        "pdo_term": {
+            "colunas": pdo_term.get("colunas", []),
+            "raw_header": pdo_term.get("raw_header", ""),
+            "total_linhas_arquivo": pdo_term.get("total_linhas_arquivo", 0),
+            "registros": pdo_term.get("registros", []),
+            "total_registros_gna": pdo_term.get("total_registros_gna", 0),
+        },
+        "historico": hist,
+    }
+    JSON_FILE.write_text(json.dumps(saida, ensure_ascii=False, indent=2), encoding="utf-8")
+    log.info(f"Salvo: {principal.get('total_registros_gna',0)} reg titulacao + {pdo_term.get('total_registros_gna',0)} reg term")
+    return saida
 
 def main():
     if not ONS_PASS:
@@ -181,15 +225,15 @@ def main():
     with tempfile.TemporaryDirectory() as tmpdir:
         zip_path = login_e_baixar(tmpdir)
         if not zip_path:
-            salvar("",{"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0})
+            salvar({})
             return 1
-        raw = extrair_dat(zip_path)
-        if not raw:
-            salvar("",{"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0})
+        dados_raw = extrair_arquivos(zip_path)
+        if not dados_raw:
+            log.error("Nenhum arquivo extraido.")
+            salvar({})
             return 1
-        dados = parsear_dat(raw)
-        salvar(raw, dados)
-        log.info(f"Concluido: {dados['total_registros_gna']} registros.")
+        salvar(dados_raw)
+        log.info("Concluido!")
         return 0
 
 if __name__ == "__main__":
