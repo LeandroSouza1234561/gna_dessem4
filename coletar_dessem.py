@@ -1,8 +1,6 @@
 """
 GNA I & II — Coleta pdo_oper_titulacao_usinas.dat — ONS/SINTEGRE
-Roda via GitHub Actions a cada 5 minutos
 """
-
 import json, logging, os, re, time, zipfile, io
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,8 +10,9 @@ ONS_USER = os.environ.get("ONS_USER", "")
 ONS_PASS = os.environ.get("ONS_PASS", "")
 URL_PORTAL    = "https://pops.ons.org.br/"
 URL_HISTORICO = "https://sintegre.ons.org.br/sites/9/51//paginas/servicos/historico-de-produtos.aspx?produto=Decks%20de%20entrada%20e%20sa%C3%ADda%20-%20Modelo%20DESSEM"
-ARQUIVO_DAT  = "pdo_oper_titulacao_usinas.dat"
-PLANTAS_ALVO = ["GNA I","GNA II","GNA 1","GNA 2","GNAI","GNAII","UTE GNA"]
+BASE_DOWNLOAD = "https://sintegre.ons.org.br/sites/9/51/_layouts/download.aspx?SourceUrl=/sites/9/51/Produtos/277/"
+ARQUIVO_DAT   = "pdo_oper_titulacao_usinas.dat"
+PLANTAS_ALVO  = ["GNA I","GNA II","GNA 1","GNA 2","GNAI","GNAII","UTE GNA"]
 DOCS_DIR  = Path(__file__).parent / "docs"
 JSON_FILE = DOCS_DIR / "dados_gna.json"
 RAW_FILE  = DOCS_DIR / "pdo_oper_titulacao_usinas.dat"
@@ -35,7 +34,7 @@ def fazer_login(page):
     time.sleep(2)
 
 def _preencher_credenciais(page):
-    for sel in ["input[name='username']","input[id='username']","input[type='email']","#i0116"]:
+    for sel in ["input[name='username']","input[type='email']","#i0116"]:
         try:
             el = page.locator(sel).first
             el.wait_for(timeout=8000)
@@ -45,40 +44,67 @@ def _preencher_credenciais(page):
     for sel in ["#idSIButton9","button:has-text('Next')"]:
         try: page.locator(sel).first.click(timeout=3000); time.sleep(1); break
         except: continue
-    for sel in ["input[name='password']","input[id='password']","input[type='password']","#i0118"]:
+    for sel in ["input[name='password']","input[type='password']","#i0118"]:
         try:
             el = page.locator(sel).first
             el.wait_for(timeout=10000)
             el.fill(ONS_PASS)
             break
         except: continue
-    for sel in ["button[type='submit']","input[type='submit']","button:has-text('Entrar')","#idSIButton9"]:
+    for sel in ["button[type='submit']","button:has-text('Entrar')","#idSIButton9"]:
         try: page.locator(sel).first.click(timeout=5000); break
         except: continue
     time.sleep(2)
 
-def encontrar_zip_mais_recente(page):
-    log.info(f"Acessando historico SINTEGRE...")
+def encontrar_nome_zip(page):
+    """Acessa o historico e extrai o nome do ZIP mais recente via XHR."""
+    log.info("Acessando historico SINTEGRE...")
     page.goto(URL_HISTORICO, wait_until="domcontentloaded", timeout=30000)
     time.sleep(4)
-    links = page.locator("a[href*='.zip'], a[href*='download.aspx']").all()
-    log.info(f"Links encontrados: {len(links)}")
-    urls = []
-    for link in links:
-        href = link.get_attribute("href") or ""
-        if ".zip" in href.lower() or "download.aspx" in href.lower():
-            if not href.startswith("http"):
-                href = "https://sintegre.ons.org.br" + href
-            urls.append(href)
-            log.info(f"  ZIP: {href}")
-    return urls[0] if urls else None
 
-def baixar_zip_e_extrair_dat(page, url_zip):
-    log.info(f"Baixando: {url_zip}")
+    # Extrai nomes de ZIP do conteúdo da página
+    conteudo = page.content()
+    zips = re.findall(r'DS_ONS_\d+_RV\d+D\d+\.zip', conteudo)
+    if zips:
+        log.info(f"ZIPs encontrados: {zips}")
+        return zips[0]
+
+    # Tenta via texto visível
+    texto = page.inner_text("body")
+    zips = re.findall(r'DS_ONS_\d+_RV\d+D\d+\.zip', texto)
+    if zips:
+        log.info(f"ZIPs no texto: {zips}")
+        return zips[0]
+
+    # Tenta via XHR (os dados vêm de chamadas getitems)
+    nome = page.evaluate("""
+        () => {
+            const links = document.querySelectorAll('a[href*=".zip"], a[href*="download"]');
+            for (const l of links) {
+                const h = l.href || l.getAttribute('href') || '';
+                const m = h.match(/DS_ONS_\\d+_RV\\d+D\\d+\\.zip/);
+                if (m) return m[0];
+            }
+            // Tenta encontrar no HTML completo
+            const m = document.body.innerHTML.match(/DS_ONS_\\d+_RV\\d+D\\d+\\.zip/);
+            return m ? m[0] : null;
+        }
+    """)
+    if nome:
+        log.info(f"ZIP via JS: {nome}")
+        return nome
+
+    log.warning("ZIP nao encontrado na pagina.")
+    return None
+
+def baixar_zip(page, nome_zip):
+    """Baixa o ZIP usando a URL de download direto."""
+    url = BASE_DOWNLOAD + nome_zip
+    log.info(f"Baixando: {url}")
     resultado = page.evaluate(f"""
         async () => {{
             try {{
-                const resp = await fetch('{url_zip}', {{credentials:'include'}});
+                const resp = await fetch('{url}', {{credentials:'include', redirect:'follow'}});
                 if (!resp.ok) return {{erro: 'HTTP '+resp.status}};
                 const buf = await resp.arrayBuffer();
                 return {{bytes: Array.from(new Uint8Array(buf))}};
@@ -94,7 +120,9 @@ def baixar_zip_e_extrair_dat(page, url_zip):
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             arquivos = zf.namelist()
             log.info(f"Conteudo ZIP: {arquivos}")
-            dat = next((n for n in arquivos if ARQUIVO_DAT.lower() in n.lower() or "pdo_oper" in n.lower()), None)
+            dat = next((n for n in arquivos if ARQUIVO_DAT.lower() in n.lower()), None)
+            if not dat:
+                dat = next((n for n in arquivos if "pdo_oper" in n.lower()), None)
             if not dat:
                 dat = next((n for n in arquivos if n.lower().endswith(".dat")), None)
             if not dat:
@@ -180,22 +208,23 @@ def main():
     if not ONS_PASS:
         log.error("ONS_PASS nao definido!")
         JSON_FILE.write_text(json.dumps({"ultima_coleta": datetime.now(timezone.utc).isoformat(),
-            "status": "erro_credencial", "colunas": [], "registros": [], "historico": []}), encoding="utf-8")
+            "status":"erro_credencial","colunas":[],"registros":[],"historico":[]}), encoding="utf-8")
         return 1
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True,
             args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"])
-        page = browser.new_context(viewport={"width":1600,"height":900}, locale="pt-BR",
+        page = browser.new_context(
+            viewport={"width":1600,"height":900}, locale="pt-BR",
             user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
         ).new_page()
         try:
             fazer_login(page)
-            url_zip = encontrar_zip_mais_recente(page)
-            if not url_zip:
+            nome_zip = encontrar_nome_zip(page)
+            if not nome_zip:
                 log.error("ZIP nao encontrado.")
                 salvar("", {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0})
                 return 1
-            raw = baixar_zip_e_extrair_dat(page, url_zip)
+            raw = baixar_zip(page, nome_zip)
             if not raw:
                 log.error("Falha ao extrair DAT.")
                 salvar("", {"colunas":[],"registros":[],"raw_header":"","total_linhas_arquivo":0,"total_registros_gna":0})
